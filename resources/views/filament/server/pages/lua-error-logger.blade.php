@@ -251,9 +251,6 @@
                                         Message d'erreur
                                     </th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                        Addon
-                                    </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                         Actions
                                     </th>
                                 </tr>
@@ -298,17 +295,6 @@
                                                     </details>
                                                 @endif
                                             </div>
-                                        </td>
-                                        
-                                        <!-- Addon -->
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            @if(isset($log['addon']) && $log['addon'] !== 'unknown')
-                                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
-                                                    {{ $log['addon'] }}
-                                                </span>
-                                            @else
-                                                <span class="text-sm text-gray-500 dark:text-gray-400">-</span>
-                                            @endif
                                         </td>
                                         
                                         <!-- Actions -->

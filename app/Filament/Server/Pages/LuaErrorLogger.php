@@ -535,6 +535,12 @@ class LuaErrorLogger extends Page
 
     public function markAsResolved(string $errorKey): void
     {
+        \Log::info('Livewire: markAsResolved called', [
+            'server_id' => $this->getServer()->id,
+            'error_key' => $errorKey,
+            'console_errors_keys' => array_keys($this->consoleErrors)
+        ]);
+        
         $this->processingError = $errorKey;
         
         if (isset($this->consoleErrors[$errorKey])) {
@@ -547,6 +553,12 @@ class LuaErrorLogger extends Page
                 'error_key' => $errorKey,
                 'error_message' => $this->consoleErrors[$errorKey]['error']['message'] ?? 'unknown'
             ]);
+        } else {
+            \Log::warning('Livewire: Error key not found in consoleErrors', [
+                'server_id' => $this->getServer()->id,
+                'error_key' => $errorKey,
+                'available_keys' => array_keys($this->consoleErrors)
+            ]);
         }
         
         $this->processingError = null;
@@ -554,6 +566,12 @@ class LuaErrorLogger extends Page
 
     public function markAsUnresolved(string $errorKey): void
     {
+        \Log::info('Livewire: markAsUnresolved called', [
+            'server_id' => $this->getServer()->id,
+            'error_key' => $errorKey,
+            'console_errors_keys' => array_keys($this->consoleErrors)
+        ]);
+        
         $this->processingError = $errorKey;
         
         if (isset($this->consoleErrors[$errorKey])) {
@@ -564,6 +582,12 @@ class LuaErrorLogger extends Page
                 'error_key' => $errorKey,
                 'error_message' => $this->consoleErrors[$errorKey]['error']['message'] ?? 'unknown'
             ]);
+        } else {
+            \Log::warning('Livewire: Error key not found in consoleErrors', [
+                'server_id' => $this->getServer()->id,
+                'error_key' => $errorKey,
+                'available_keys' => array_keys($this->consoleErrors)
+            ]);
         }
         
         $this->processingError = null;
@@ -571,6 +595,12 @@ class LuaErrorLogger extends Page
 
     public function deleteError(string $errorKey): void
     {
+        \Log::info('Livewire: deleteError called', [
+            'server_id' => $this->getServer()->id,
+            'error_key' => $errorKey,
+            'console_errors_keys' => array_keys($this->consoleErrors)
+        ]);
+        
         if (isset($this->consoleErrors[$errorKey])) {
             $errorMessage = $this->consoleErrors[$errorKey]['error']['message'] ?? 'unknown';
             
@@ -581,6 +611,12 @@ class LuaErrorLogger extends Page
                 'server_id' => $this->getServer()->id,
                 'error_key' => $errorKey,
                 'error_message' => $errorMessage
+            ]);
+        } else {
+            \Log::warning('Livewire: Error key not found in consoleErrors for deletion', [
+                'server_id' => $this->getServer()->id,
+                'error_key' => $errorKey,
+                'available_keys' => array_keys($this->consoleErrors)
             ]);
         }
     }
