@@ -376,6 +376,11 @@ class LuaErrorLogger extends Page
         $this->logsPaused = !$this->logsPaused;
     }
 
+    public function togglePause(): void
+    {
+        $this->logsPaused = !$this->logsPaused;
+    }
+
     public function updatedSearch(): void
     {
         // La recherche se met à jour automatiquement grâce aux computed properties
