@@ -27,8 +27,22 @@ class LuaLogService
                 'daemon_url' => $daemonUrl
             ]);
 
+            // Récupérer le token d'authentification
+            $token = $this->getDaemonToken($server);
+            Log::channel('lua')->info('Using daemon token', [
+                'server_id' => $server->id,
+                'token_length' => strlen($token),
+                'token_preview' => $token ? substr($token, 0, 10) . '...' : 'empty'
+            ]);
+            
             // Récupérer les logs de la console via l'API du daemon
-            $response = Http::timeout(10)->get($daemonUrl);
+            $response = Http::timeout(10)
+                ->withHeaders([
+                    'Authorization' => 'Bearer ' . $token,
+                    'Accept' => 'application/json',
+                    'Content-Type' => 'application/json',
+                ])
+                ->get($daemonUrl);
             
             if ($response->successful()) {
                 $consoleOutput = $response->body();
@@ -304,6 +318,33 @@ class LuaLogService
         $port = $node->daemon_listen ?? 8080;
         
         return "{$scheme}://{$host}:{$port}";
+    }
+
+    /**
+     * Récupère le token d'authentification pour le daemon
+     */
+    private function getDaemonToken(Server $server): string
+    {
+        // Le token est généralement stocké dans la configuration du nœud
+        $node = $server->node;
+        
+        // Essayer de récupérer le token depuis la configuration du nœud
+        if (isset($node->daemon_token)) {
+            return $node->daemon_token;
+        }
+        
+        // Fallback : utiliser un token par défaut ou depuis l'environnement
+        $defaultToken = config('panel.daemon.token') ?? env('DAEMON_TOKEN', '');
+        
+        if (empty($defaultToken)) {
+            Log::channel('lua')->warning('No daemon token found', [
+                'server_id' => $server->id,
+                'node_id' => $node->id
+            ]);
+            return '';
+        }
+        
+        return $defaultToken;
     }
 
     /**
