@@ -36,6 +36,7 @@ class LuaErrorLogger extends Page
     public $search = '';
     public $levelFilter = '';
     public $timeFilter = '24h';
+    public $showResolved = true;
     public $logsPaused = false;
     public $autoScroll = true;
     public $consoleErrors = []; // Structure: ['error_key' => ['error' => {...}, 'count' => X, 'last_seen' => timestamp]]
@@ -188,36 +189,23 @@ class LuaErrorLogger extends Page
                 $error['count'] = $errorData['count'];
                 $error['first_seen'] = $errorData['first_seen'];
                 $error['last_seen'] = $errorData['last_seen'];
+                $error['resolved'] = $errorData['resolved'] ?? false;
+                $error['error_key'] = $errorKey; // Ajouter la clé pour les actions
                 $consoleLogs[] = $error;
             }
             
-            // Combiner avec les erreurs de console en temps réel
+            // Combiner les logs stockés avec les erreurs de console (déjà comptées)
             $allLogs = array_merge($storedLogs, $consoleLogs);
             
-            // Regrouper les erreurs identiques par message et addon
-            $groupedLogs = [];
-            foreach ($allLogs as $log) {
-                $key = $this->createErrorKey($log);
-                
-                if (isset($groupedLogs[$key])) {
-                    // Erreur déjà existante, incrémenter le compteur
-                    $groupedLogs[$key]['count']++;
-                    $groupedLogs[$key]['last_seen'] = $log['last_seen'] ?? $log['timestamp'];
-                    // Garder le timestamp le plus récent
-                    if (isset($log['timestamp']) && (!isset($groupedLogs[$key]['timestamp']) || strtotime($log['timestamp']) > strtotime($groupedLogs[$key]['timestamp']))) {
-                        $groupedLogs[$key]['timestamp'] = $log['timestamp'];
-                    }
-                } else {
-                    // Nouvelle erreur, l'ajouter
-                    $log['count'] = 1;
-                    $log['first_seen'] = $log['timestamp'];
-                    $groupedLogs[$key] = $log;
-                }
+            // Filtrer les erreurs résolues si nécessaire
+            if (!$this->showResolved) {
+                $allLogs = array_filter($allLogs, function($log) {
+                    return !($log['resolved'] ?? false);
+                });
             }
             
-            // Convertir en tableau indexé et trier par timestamp (plus récent en premier)
-            $finalLogs = array_values($groupedLogs);
-            usort($finalLogs, function($a, $b) {
+            // Trier par timestamp (plus récent en premier)
+            usort($allLogs, function($a, $b) {
                 $timestampA = $a['last_seen'] ?? $a['timestamp'] ?? '';
                 $timestampB = $b['last_seen'] ?? $b['timestamp'] ?? '';
                 return strtotime($timestampB) - strtotime($timestampA);
@@ -227,10 +215,10 @@ class LuaErrorLogger extends Page
                 'server_id' => $this->getServer()->id,
                 'stored_logs_count' => count($storedLogs),
                 'console_logs_count' => count($consoleLogs),
-                'grouped_logs_count' => count($finalLogs)
+                'total_logs_count' => count($allLogs)
             ]);
             
-            return $finalLogs;
+            return $allLogs;
         } catch (\Exception $e) {
             \Log::error('Livewire: Error in getLogs', [
                 'server_id' => $this->getServer()->id ?? 'unknown',
@@ -257,7 +245,8 @@ class LuaErrorLogger extends Page
                 'critical_errors' => 0,
                 'warnings' => 0,
                 'info' => 0,
-                'total' => 0
+                'total' => 0,
+                'resolved' => 0
             ];
             
             foreach ($this->consoleErrors as $errorKey => $errorData) {
@@ -277,6 +266,11 @@ class LuaErrorLogger extends Page
                 }
                 
                 $consoleStats['total'] += $errorData['count'];
+                
+                // Compter les erreurs résolues
+                if ($errorData['resolved'] ?? false) {
+                    $consoleStats['resolved'] += $errorData['count'];
+                }
             }
             
             // Combiner les stats avec vérification des clés
@@ -284,7 +278,8 @@ class LuaErrorLogger extends Page
                 'critical_errors' => ($storedStats['critical_errors'] ?? 0) + $consoleStats['critical_errors'],
                 'warnings' => ($storedStats['warnings'] ?? 0) + $consoleStats['warnings'],
                 'info' => ($storedStats['info'] ?? 0) + $consoleStats['info'],
-                'total' => ($storedStats['total'] ?? 0) + $consoleStats['total']
+                'total' => ($storedStats['total'] ?? 0) + $consoleStats['total'],
+                'resolved' => $consoleStats['resolved']
             ];
             
             \Log::debug('Livewire: getStats called', [
@@ -375,7 +370,8 @@ class LuaErrorLogger extends Page
                         'error' => $error,
                         'count' => 1,
                         'first_seen' => now()->toISOString(),
-                        'last_seen' => now()->toISOString()
+                        'last_seen' => now()->toISOString(),
+                        'resolved' => false
                     ];
                     
                     \Log::info('Livewire: Adding new error', [
@@ -443,6 +439,32 @@ class LuaErrorLogger extends Page
     public function togglePause(): void
     {
         $this->logsPaused = !$this->logsPaused;
+    }
+
+    public function markAsResolved(string $errorKey): void
+    {
+        if (isset($this->consoleErrors[$errorKey])) {
+            $this->consoleErrors[$errorKey]['resolved'] = true;
+            
+            \Log::info('Livewire: Error marked as resolved', [
+                'server_id' => $this->getServer()->id,
+                'error_key' => $errorKey,
+                'error_message' => $this->consoleErrors[$errorKey]['error']['message'] ?? 'unknown'
+            ]);
+        }
+    }
+
+    public function markAsUnresolved(string $errorKey): void
+    {
+        if (isset($this->consoleErrors[$errorKey])) {
+            $this->consoleErrors[$errorKey]['resolved'] = false;
+            
+            \Log::info('Livewire: Error marked as unresolved', [
+                'server_id' => $this->getServer()->id,
+                'error_key' => $errorKey,
+                'error_message' => $this->consoleErrors[$errorKey]['error']['message'] ?? 'unknown'
+            ]);
+        }
     }
 
     public function updatedSearch(): void

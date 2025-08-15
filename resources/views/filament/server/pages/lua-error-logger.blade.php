@@ -25,7 +25,7 @@
             
             <!-- Grille des statistiques -->
             <div class="p-6">
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
                     <!-- Erreurs critiques -->
                     <div class="relative group">
                         <div class="bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 rounded-xl p-6 border border-red-200 dark:border-red-700/50 transition-all duration-200 group-hover:shadow-lg group-hover:scale-105">
@@ -109,6 +109,27 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Erreurs résolues -->
+                    <div class="relative group">
+                        <div class="bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 rounded-xl p-6 border border-emerald-200 dark:border-emerald-700/50 transition-all duration-200 group-hover:shadow-lg group-hover:scale-105">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
+                                    <svg class="w-6 h-6 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{{ $stats['resolved'] ?? 0 }}</p>
+                                    <p class="text-xs text-emerald-500 dark:text-emerald-400 font-medium">Résolues</p>
+                                </div>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-sm font-semibold text-emerald-800 dark:text-emerald-300">Erreurs résolues</p>
+                                <p class="text-xs text-emerald-600 dark:text-emerald-400 mt-1">Problèmes traités</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -156,6 +177,22 @@
                         <option value="all">Tout</option>
                     </select>
                 </div>
+                <div class="sm:w-48">
+                    <label for="show-resolved" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Afficher les résolues
+                    </label>
+                    <div class="flex items-center">
+                        <input
+                            type="checkbox"
+                            wire:model.live="showResolved"
+                            id="show-resolved"
+                            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded dark:border-gray-600 dark:bg-gray-700"
+                        >
+                        <label for="show-resolved" class="ml-2 text-sm text-gray-700 dark:text-gray-300">
+                            {{ $showResolved ? 'Oui' : 'Non' }}
+                        </label>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -202,14 +239,48 @@
                     @if(count($logs) > 0)
                         <div class="divide-y divide-gray-200 dark:divide-gray-700">
                             @foreach($logs as $log)
-                                <div class="p-4 hover:bg-gray-700/50 dark:hover:bg-gray-600/50 transition-colors {{ isset($log['count']) ? 'ring-2 ring-blue-300 dark:ring-blue-600' : '' }}">
-                                    @if(isset($log['count']) && $log['count'] > 1)
-                                        <div class="flex items-center justify-end mb-1">
+                                <div class="p-4 hover:bg-gray-700/50 dark:hover:bg-gray-600/50 transition-colors {{ isset($log['count']) ? 'ring-2 ring-blue-300 dark:ring-blue-600' : '' }} {{ $log['resolved'] ?? false ? 'opacity-60 bg-green-50 dark:bg-green-900/20' : '' }}">
+                                    <div class="flex items-center justify-between mb-1">
+                                        @if(isset($log['count']) && $log['count'] > 1)
                                             <span class="text-xs text-gray-500 dark:text-gray-400">
                                                 Première fois: {{ \Carbon\Carbon::parse($log['first_seen'])->format('H:i:s') }}
                                             </span>
-                                        </div>
-                                    @endif
+                                        @else
+                                            <span></span>
+                                        @endif
+                                        
+                                        @if(isset($log['error_key']))
+                                            <div class="flex items-center space-x-2">
+                                                @if($log['resolved'] ?? false)
+                                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                                        </svg>
+                                                        Résolu
+                                                    </span>
+                                                    <button
+                                                        wire:click="markAsUnresolved('{{ $log['error_key'] }}')"
+                                                        class="px-2 py-1 text-xs rounded-md transition-colors bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 hover:bg-yellow-200 dark:hover:bg-yellow-800/30"
+                                                        title="Marquer comme non résolu"
+                                                    >
+                                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                                        </svg>
+                                                    </button>
+                                                @else
+                                                    <button
+                                                        wire:click="markAsResolved('{{ $log['error_key'] }}')"
+                                                        class="px-2 py-1 text-xs rounded-md transition-colors bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800/30"
+                                                        title="Marquer comme résolu"
+                                                    >
+                                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                                        </svg>
+                                                    </button>
+                                                @endif
+                                            </div>
+                                        @endif
+                                    </div>
                                     <div class="flex items-start space-x-2">
                                         <div class="flex-shrink-0">
                                             <span class="text-xs text-gray-500 dark:text-gray-400">
