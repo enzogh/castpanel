@@ -16,21 +16,47 @@ class LuaLogService
     public function monitorConsole(Server $server): array
     {
         if (!$this->isGarrysModServer($server)) {
+            Log::channel('lua')->info('Server is not Garry\'s Mod', ['server_id' => $server->id]);
             return [];
         }
 
         try {
+            $daemonUrl = $this->getDaemonUrl($server) . '/api/servers/' . $server->uuid . '/logs';
+            Log::channel('lua')->info('Monitoring console', [
+                'server_id' => $server->id,
+                'daemon_url' => $daemonUrl
+            ]);
+
             // Récupérer les logs de la console via l'API du daemon
-            $response = Http::timeout(10)->get($this->getDaemonUrl($server) . '/api/servers/' . $server->uuid . '/logs');
+            $response = Http::timeout(10)->get($daemonUrl);
             
             if ($response->successful()) {
                 $consoleOutput = $response->body();
-                return $this->parseConsoleForLuaErrors($consoleOutput);
+                Log::channel('lua')->info('Console output received', [
+                    'server_id' => $server->id,
+                    'output_length' => strlen($consoleOutput),
+                    'first_100_chars' => substr($consoleOutput, 0, 100)
+                ]);
+                
+                $errors = $this->parseConsoleForLuaErrors($consoleOutput);
+                Log::channel('lua')->info('Lua errors parsed', [
+                    'server_id' => $server->id,
+                    'errors_count' => count($errors)
+                ]);
+                
+                return $errors;
+            } else {
+                Log::channel('lua')->warning('Daemon API response not successful', [
+                    'server_id' => $server->id,
+                    'status' => $response->status(),
+                    'body' => $response->body()
+                ]);
             }
         } catch (\Exception $e) {
             Log::channel('lua')->error('Failed to monitor console', [
                 'server_id' => $server->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
         }
 
@@ -45,17 +71,45 @@ class LuaLogService
         $errors = [];
         $lines = explode("\n", $consoleOutput);
         
+        Log::channel('lua')->info('Parsing console output', [
+            'total_lines' => count($lines),
+            'output_length' => strlen($consoleOutput)
+        ]);
+        
         foreach ($lines as $lineNumber => $line) {
             $line = trim($line);
             
+            // Debug: logger chaque ligne pour voir ce qui arrive
+            if (!empty($line)) {
+                Log::channel('lua')->debug('Processing line', [
+                    'line_number' => $lineNumber + 1,
+                    'line_content' => $line,
+                    'line_length' => strlen($line)
+                ]);
+            }
+            
             // Détecter les erreurs Lua
             if ($this->isLuaError($line)) {
+                Log::channel('lua')->info('Lua error detected', [
+                    'line_number' => $lineNumber + 1,
+                    'line_content' => $line
+                ]);
+                
                 $error = $this->extractLuaError($line, $lines, $lineNumber);
                 if ($error) {
                     $errors[] = $error;
+                    Log::channel('lua')->info('Error extracted successfully', [
+                        'line_number' => $lineNumber + 1,
+                        'error_type' => $error['error_type'] ?? 'unknown',
+                        'addon' => $error['addon'] ?? 'unknown'
+                    ]);
                 }
             }
         }
+
+        Log::channel('lua')->info('Console parsing completed', [
+            'total_errors_found' => count($errors)
+        ]);
 
         return $errors;
     }
@@ -71,8 +125,15 @@ class LuaLogService
     {
         // Vérifier d'abord le pattern principal [ERROR]
         if (!preg_match('/^\[ERROR\]/i', $line)) {
+            Log::channel('lua')->debug('Line does not start with [ERROR]', [
+                'line_content' => $line
+            ]);
             return false;
         }
+
+        Log::channel('lua')->debug('Line starts with [ERROR], checking Lua patterns', [
+            'line_content' => $line
+        ]);
 
         // Vérifier que c'est bien une erreur Lua (pas juste un [ERROR] générique)
         $luaErrorPatterns = [
@@ -91,12 +152,19 @@ class LuaLogService
 
         foreach ($luaErrorPatterns as $pattern) {
             if (preg_match($pattern, $line)) {
+                Log::channel('lua')->debug('Lua pattern matched', [
+                    'line_content' => $line,
+                    'pattern' => $pattern
+                ]);
                 return true;
             }
         }
 
         // Si on a [ERROR] mais pas de pattern Lua spécifique, on considère quand même que c'est une erreur
         // car [ERROR] indique généralement une erreur Lua dans Garry's Mod
+        Log::channel('lua')->debug('No specific Lua pattern matched, but [ERROR] present - treating as Lua error', [
+            'line_content' => $line
+        ]);
         return true;
     }
 

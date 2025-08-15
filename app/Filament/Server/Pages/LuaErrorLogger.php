@@ -83,6 +83,16 @@ class LuaErrorLogger extends Page
     #[Computed]
     public function getLogs(): array
     {
+        \Log::channel('lua')->debug('Livewire: getLogs computed property called', [
+            'server_id' => $this->getServer()->id,
+            'filters' => [
+                'level' => $this->levelFilter,
+                'search' => $this->search,
+                'time' => $this->timeFilter,
+            ],
+            'console_errors_count' => count($this->consoleErrors)
+        ]);
+
         $filters = [
             'level' => $this->levelFilter,
             'search' => $this->search,
@@ -98,6 +108,12 @@ class LuaErrorLogger extends Page
         usort($allLogs, function($a, $b) {
             return strtotime($b['timestamp']) - strtotime($a['timestamp']);
         });
+        
+        \Log::channel('lua')->debug('Livewire: getLogs computed property completed', [
+            'server_id' => $this->getServer()->id,
+            'stored_logs_count' => count($storedLogs),
+            'total_logs_count' => count($allLogs)
+        ]);
         
         return $allLogs;
     }
@@ -122,15 +138,34 @@ class LuaErrorLogger extends Page
 
     public function refreshLogs(): void
     {
+        \Log::channel('lua')->info('Livewire: refreshLogs called', [
+            'server_id' => $this->getServer()->id,
+            'timestamp' => now()->toISOString()
+        ]);
+        
         // Surveiller la console pour de nouvelles erreurs
         $this->monitorConsole();
         $this->dispatch('logs-refreshed');
+        
+        \Log::channel('lua')->info('Livewire: refreshLogs completed', [
+            'server_id' => $this->getServer()->id
+        ]);
     }
 
     public function monitorConsole(): void
     {
         if (!$this->logsPaused) {
+            \Log::channel('lua')->info('Livewire: Starting console monitoring', [
+                'server_id' => $this->getServer()->id,
+                'logs_paused' => $this->logsPaused
+            ]);
+            
             $newErrors = $this->getLuaLogService()->monitorConsole($this->getServer());
+            
+            \Log::channel('lua')->info('Livewire: Console monitoring completed', [
+                'server_id' => $this->getServer()->id,
+                'new_errors_count' => count($newErrors)
+            ]);
             
             foreach ($newErrors as $error) {
                 // Vérifier si l'erreur n'existe pas déjà
@@ -144,6 +179,12 @@ class LuaErrorLogger extends Page
                 }
                 
                 if (!$exists) {
+                    \Log::channel('lua')->info('Livewire: Adding new error', [
+                        'server_id' => $this->getServer()->id,
+                        'error_message' => $error['message'],
+                        'error_addon' => $error['addon'] ?? 'unknown'
+                    ]);
+                    
                     $this->consoleErrors[] = $error;
                     
                     // Sauvegarder l'erreur dans le fichier de log
@@ -154,6 +195,11 @@ class LuaErrorLogger extends Page
                         $error['addon'],
                         $error['stack_trace']
                     );
+                } else {
+                    \Log::channel('lua')->debug('Livewire: Adding new error', [
+                        'server_id' => $this->getServer()->id,
+                        'error_message' => $error['message']
+                    ]);
                 }
             }
             
@@ -161,6 +207,10 @@ class LuaErrorLogger extends Page
             if (count($this->consoleErrors) > 100) {
                 $this->consoleErrors = array_slice($this->consoleErrors, -100);
             }
+        } else {
+            \Log::channel('lua')->debug('Livewire: Console monitoring paused', [
+                'server_id' => $this->getServer()->id
+            ]);
         }
     }
 
