@@ -950,82 +950,6 @@ class LuaLogService
     }
 
     /**
-     * Marque un log comme résolu en base de données
-     */
-    public function markLogAsResolved(Server $server, string $errorKey): bool
-    {
-        try {
-            $luaError = LuaError::where('error_key', $errorKey)
-                ->where('server_id', $server->id)
-                ->first();
-
-            if (!$luaError) {
-                Log::channel('lua')->warning('Log not found for marking as resolved', [
-                    'server_id' => $server->id,
-                    'error_key' => $errorKey
-                ]);
-                return false;
-            }
-
-            $luaError->markAsResolved();
-
-            Log::channel('lua')->info('Log marked as resolved in database', [
-                'server_id' => $server->id,
-                'error_key' => $errorKey,
-                'message' => $luaError->message
-            ]);
-
-            return true;
-
-        } catch (\Exception $e) {
-            Log::channel('lua')->error('Error marking log as resolved', [
-                'server_id' => $server->id,
-                'error_key' => $errorKey,
-                'error' => $e->getMessage()
-            ]);
-            return false;
-        }
-    }
-
-    /**
-     * Marque un log comme non résolu en base de données
-     */
-    public function markLogAsUnresolved(Server $server, string $errorKey): bool
-    {
-        try {
-            $luaError = LuaError::where('error_key', $errorKey)
-                ->where('server_id', $server->id)
-                ->first();
-
-            if (!$luaError) {
-                Log::channel('lua')->warning('Log not found for marking as unresolved', [
-                    'server_id' => $server->id,
-                    'error_key' => $errorKey
-                ]);
-                return false;
-            }
-
-            $luaError->markAsUnresolved();
-
-            Log::channel('lua')->info('Log marked as unresolved in database', [
-                'server_id' => $server->id,
-                'error_key' => $errorKey,
-                'message' => $luaError->message
-            ]);
-
-            return true;
-
-        } catch (\Exception $e) {
-            Log::channel('lua')->error('Error marking log as unresolved', [
-                'server_id' => $server->id,
-                'error_key' => $errorKey,
-                'error' => $e->getMessage()
-            ]);
-            return false;
-        }
-    }
-
-    /**
      * Ferme un log (suppression soft) au lieu de le supprimer physiquement
      */
     public function deleteLog(string $errorKey, int $serverId): bool
@@ -1104,6 +1028,48 @@ class LuaLogService
 
         } catch (\Exception $e) {
             \Log::error('LuaLogService: Error marking as resolved', [
+                'error_key' => $errorKey,
+                'server_id' => $serverId,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
+    public function markAsUnresolved(string $errorKey, int $serverId): bool
+    {
+        try {
+            $luaError = LuaError::where('error_key', $errorKey)
+                ->where('server_id', $serverId)
+                ->where('status', '!=', 'closed')
+                ->whereNull('closed_at')
+                ->first();
+
+            if (!$luaError) {
+                \Log::warning('LuaLogService: Cannot find error to mark as unresolved', [
+                    'error_key' => $errorKey,
+                    'server_id' => $serverId
+                ]);
+                return false;
+            }
+
+            // Marquer comme non résolu directement en base
+            $luaError->update([
+                'status' => 'open',
+                'resolved' => false,
+                'resolved_at' => null
+            ]);
+
+            \Log::info('LuaLogService: Error marked as unresolved in database', [
+                'error_key' => $errorKey,
+                'server_id' => $serverId,
+                'status' => 'open'
+            ]);
+
+            return true;
+
+        } catch (\Exception $e) {
+            \Log::error('LuaLogService: Error marking as unresolved', [
                 'error_key' => $errorKey,
                 'server_id' => $serverId,
                 'error' => $e->getMessage()

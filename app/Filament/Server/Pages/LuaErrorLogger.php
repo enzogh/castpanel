@@ -643,7 +643,7 @@ class LuaErrorLogger extends Page
             ]);
             
             // Marquer l'erreur comme résolue dans les logs stockés
-            $success = $this->getLuaLogService()->markLogAsResolved($this->getServer(), $errorKey);
+            $success = $this->getLuaLogService()->markAsResolved($errorKey, $this->getServer()->id);
             
             if ($success) {
                 \Log::info('Livewire: Error marked as resolved in stored logs', [
@@ -699,7 +699,7 @@ class LuaErrorLogger extends Page
             ]);
             
             // Marquer l'erreur comme non résolue dans les logs stockés
-            $success = $this->getLuaLogService()->markLogAsUnresolved($this->getServer(), $errorKey);
+            $success = $this->getLuaLogService()->markAsUnresolved($errorKey, $this->getServer()->id);
             
             if ($success) {
                 \Log::info('Livewire: Error marked as unresolved in stored logs', [
@@ -750,7 +750,7 @@ class LuaErrorLogger extends Page
         
         // 2. Fermer dans la base de données (suppression soft)
         try {
-            $success = $this->getLuaLogService()->deleteLog($this->getServer(), $errorKey);
+            $success = $this->getLuaLogService()->deleteLog($errorKey, $this->getServer()->id);
             $deletedFromStored = $success;
             
             if ($success) {
