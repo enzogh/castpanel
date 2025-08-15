@@ -4,6 +4,7 @@ namespace App\Filament\Server\Pages;
 
 use App\Models\Server;
 use App\Services\Servers\LuaLogService;
+use App\Services\Servers\LuaConsoleMonitorService;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Pages\Page;
@@ -30,6 +31,9 @@ class LuaErrorLogger extends Page
         Log::info('Livewire: LuaErrorLogger page mounted', [
             'server_id' => $this->getServer()->id
         ]);
+        
+        // Démarrer la surveillance automatique de la console
+        $this->startConsoleMonitoring();
     }
 
     public function getTitle(): string
@@ -183,6 +187,41 @@ class LuaErrorLogger extends Page
                 'error' => $e->getMessage()
             ]);
         }
+    }
+
+    /**
+     * Démarre la surveillance automatique de la console
+     */
+    public function startConsoleMonitoring(): void
+    {
+        try {
+            $monitorService = app(LuaConsoleMonitorService::class);
+            $newErrors = $monitorService->monitorConsole($this->getServer());
+            
+            if (count($newErrors) > 0) {
+                Log::info('Livewire: Console monitoring started, new errors found', [
+                    'server_id' => $this->getServer()->id,
+                    'new_errors_count' => count($newErrors)
+                ]);
+                
+                // Forcer le refresh de l'interface
+                $this->dispatch('$refresh');
+            }
+            
+        } catch (\Exception $e) {
+            Log::error('Livewire: Failed to start console monitoring', [
+                'server_id' => $this->getServer()->id,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Méthode appelée pour la surveillance en temps réel
+     */
+    public function monitorConsole(): void
+    {
+        $this->startConsoleMonitoring();
     }
 
     protected function getHeaderActions(): array
