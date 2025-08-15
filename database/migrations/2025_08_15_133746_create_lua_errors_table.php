@@ -22,11 +22,15 @@ return new class extends Migration
             $table->integer('count')->default(1);
             $table->timestamp('first_seen');
             $table->timestamp('last_seen');
-            $table->boolean('resolved')->default(false);
+            $table->enum('status', ['open', 'resolved', 'closed'])->default('open'); // Statut explicite
+            $table->boolean('resolved')->default(false); // Garder pour compatibilité
             $table->timestamp('resolved_at')->nullable();
+            $table->timestamp('closed_at')->nullable(); // Quand l'erreur a été fermée
+            $table->text('resolution_notes')->nullable(); // Notes sur la résolution
             $table->timestamps();
             
             // Index pour les performances
+            $table->index(['server_id', 'status']);
             $table->index(['server_id', 'resolved']);
             $table->index(['error_key']);
             $table->index(['first_seen']);
