@@ -47,6 +47,7 @@ class LuaErrorLogger extends Page
     public $processingError = null;
     public $consoleErrors = []; // Structure: ['error_key' => ['error' => {...}, 'count' => X, 'last_seen' => timestamp]]
     public $lastConsoleCheck = null; // Timestamp de la dernière vérification de la console
+    public $deletedErrors = []; // Liste des erreurs supprimées pour éviter la redétection
     
     // Propriétés publiques pour la vue
     public array $stats = [
@@ -480,6 +481,17 @@ class LuaErrorLogger extends Page
                 // Créer une clé unique pour cette erreur (basée sur le message et l'addon)
                 $errorKey = $this->createErrorKey($error);
                 
+                // Vérifier si cette erreur a été supprimée
+                if (isset($this->deletedErrors[$errorKey])) {
+                    \Log::debug('Livewire: Skipping deleted error', [
+                        'server_id' => $this->getServer()->id,
+                        'error_key' => $errorKey,
+                        'error_message' => $error['message'],
+                        'deleted_at' => $this->deletedErrors[$errorKey]['deleted_at']
+                    ]);
+                    continue; // Ignorer cette erreur supprimée
+                }
+                
                 if (isset($this->consoleErrors[$errorKey])) {
                     // Erreur déjà existante, incrémenter le compteur seulement si elle n'est pas résolue
                     if (!($this->consoleErrors[$errorKey]['resolved'] ?? false)) {
@@ -557,6 +569,9 @@ class LuaErrorLogger extends Page
             
             // Nettoyer les erreurs résolues anciennes
             $this->cleanupResolvedErrors();
+            
+            // Nettoyer les erreurs supprimées anciennes
+            $this->cleanupDeletedErrors();
         } else {
             \Log::debug('Livewire: Console monitoring paused', [
                 'server_id' => $this->getServer()->id
@@ -769,6 +784,12 @@ class LuaErrorLogger extends Page
         
         // 3. Forcer la mise à jour de l'interface si au moins une suppression a réussi
         if ($deletedFromConsole || $deletedFromStored) {
+            // Ajouter l'erreur à la liste des erreurs supprimées pour éviter la redétection
+            $this->deletedErrors[$errorKey] = [
+                'deleted_at' => now()->toISOString(),
+                'server_id' => $this->getServer()->id
+            ];
+            
             $this->dispatch('error-deleted', ['error_key' => $errorKey]);
             
             // Rafraîchir les données immédiatement
@@ -778,7 +799,8 @@ class LuaErrorLogger extends Page
                 'server_id' => $this->getServer()->id,
                 'error_key' => $errorKey,
                 'deleted_from_console' => $deletedFromConsole,
-                'deleted_from_stored' => $deletedFromStored
+                'deleted_from_stored' => $deletedFromStored,
+                'deleted_errors_count' => count($this->deletedErrors)
             ]);
         } else {
             \Log::warning('Livewire: deleteError failed - error not found anywhere', [
@@ -808,6 +830,31 @@ class LuaErrorLogger extends Page
         
         if ($cleanedCount > 0) {
             \Log::info('Livewire: Cleaned up resolved errors', [
+                'server_id' => $this->getServer()->id,
+                'cleaned_count' => $cleanedCount
+            ]);
+        }
+    }
+
+    /**
+     * Nettoie les erreurs supprimées anciennes pour éviter l'accumulation
+     */
+    public function cleanupDeletedErrors(): void
+    {
+        $cutoffTime = now()->subHours(24); // Supprimer les erreurs supprimées de plus de 24h
+        $cleanedCount = 0;
+        
+        foreach ($this->deletedErrors as $errorKey => $deletedData) {
+            if (isset($deletedData['deleted_at']) && 
+                strtotime($deletedData['deleted_at']) < $cutoffTime->timestamp()) {
+                
+                unset($this->deletedErrors[$errorKey]);
+                $cleanedCount++;
+            }
+        }
+        
+        if ($cleanedCount > 0) {
+            \Log::info('Livewire: Cleaned up deleted errors', [
                 'server_id' => $this->getServer()->id,
                 'cleaned_count' => $cleanedCount
             ]);
