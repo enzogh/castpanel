@@ -72,6 +72,15 @@ class LuaErrorLogger extends Page
         return 'Logger d\'erreur Lua';
     }
 
+    public static function getNavigationGroup(): ?string
+    {
+        return 'Outils et surveillance';
+    }
+
+    protected static ?int $navigationSort = 6;
+
+    protected static ?string $navigationIcon = 'tabler-bug';
+
     #[Computed]
     public function getServer(): Server
     {
