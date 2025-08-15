@@ -725,50 +725,66 @@ class LuaErrorLogger extends Page
             'console_errors_keys' => array_keys($this->consoleErrors)
         ]);
         
+        $deletedFromConsole = false;
+        $deletedFromStored = false;
+        
+        // 1. Supprimer de la mémoire (consoleErrors) si elle existe
         if (isset($this->consoleErrors[$errorKey])) {
             $errorMessage = $this->consoleErrors[$errorKey]['error']['message'] ?? 'unknown';
             
             // Supprimer l'erreur de la liste
             unset($this->consoleErrors[$errorKey]);
+            $deletedFromConsole = true;
             
             \Log::info('Livewire: Error deleted from consoleErrors', [
                 'server_id' => $this->getServer()->id,
                 'error_key' => $errorKey,
                 'error_message' => $errorMessage
             ]);
-            
-            // Forcer la mise à jour de l'interface
-            $this->dispatch('error-deleted', ['error_key' => $errorKey]);
-            
-            // Rafraîchir les données immédiatement
-            $this->refreshData();
-        } else {
-            // L'erreur n'est pas dans consoleErrors, essayer de la supprimer des logs stockés
-            \Log::info('Livewire: Error not in consoleErrors, trying to delete from stored logs', [
-                'server_id' => $this->getServer()->id,
-                'error_key' => $errorKey
-            ]);
-            
-            // Supprimer l'erreur des logs stockés
+        }
+        
+        // 2. Supprimer de la base de données (toujours essayer)
+        try {
             $success = $this->getLuaLogService()->deleteLog($this->getServer(), $errorKey);
+            $deletedFromStored = $success;
             
             if ($success) {
                 \Log::info('Livewire: Error deleted from stored logs', [
                     'server_id' => $this->getServer()->id,
                     'error_key' => $errorKey
                 ]);
-                
-                // Forcer la mise à jour de l'interface
-                $this->dispatch('error-deleted', ['error_key' => $errorKey]);
-                
-                // Rafraîchir les données immédiatement
-                $this->refreshData();
             } else {
                 \Log::warning('Livewire: Failed to delete error from stored logs', [
                     'server_id' => $this->getServer()->id,
                     'error_key' => $errorKey
                 ]);
             }
+        } catch (\Exception $e) {
+            \Log::error('Livewire: Exception while deleting from stored logs', [
+                'server_id' => $this->getServer()->id,
+                'error_key' => $errorKey,
+                'error' => $e->getMessage()
+            ]);
+        }
+        
+        // 3. Forcer la mise à jour de l'interface si au moins une suppression a réussi
+        if ($deletedFromConsole || $deletedFromStored) {
+            $this->dispatch('error-deleted', ['error_key' => $errorKey]);
+            
+            // Rafraîchir les données immédiatement
+            $this->refreshData();
+            
+            \Log::info('Livewire: deleteError completed successfully', [
+                'server_id' => $this->getServer()->id,
+                'error_key' => $errorKey,
+                'deleted_from_console' => $deletedFromConsole,
+                'deleted_from_stored' => $deletedFromStored
+            ]);
+        } else {
+            \Log::warning('Livewire: deleteError failed - error not found anywhere', [
+                'server_id' => $this->getServer()->id,
+                'error_key' => $errorKey
+            ]);
         }
     }
     
