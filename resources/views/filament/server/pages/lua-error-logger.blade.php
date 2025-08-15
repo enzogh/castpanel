@@ -74,7 +74,7 @@
             @endphp
             
             <!-- Surveillance automatique de la console -->
-            <div class="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
+            <div wire:poll.30s="monitorConsole" class="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center">
                         <svg class="w-2 h-2 text-blue-600 dark:text-blue-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -83,12 +83,18 @@
                         <div>
                             <h3 class="text-sm font-medium text-blue-800 dark:text-blue-200">Surveillance de la console</h3>
                             <p class="text-xs text-blue-600 dark:text-blue-400">
-                                Capture automatique des erreurs Lua [ERROR] 
-                                @if(isset($logs) && is_array($logs))
-                                    ({{ count($logs) }} erreur(s) ouverte(s))
-                                @else
-                                    (Erreurs en cours de chargement...)
-                                @endif
+                                <span class="inline-flex items-center">
+                                    <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse mr-2"></span>
+                                    Surveillance active - Capture automatique des erreurs Lua [ERROR] 
+                                    @if(isset($logs) && is_array($logs))
+                                        ({{ count($logs) }} erreur(s) ouverte(s))
+                                    @else
+                                        (Erreurs en cours de chargement...)
+                                    @endif
+                                </span>
+                            </p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                Dernière vérification : {{ now()->format('H:i:s') }} | Polling toutes les 30 secondes
                             </p>
                         </div>
                     </div>

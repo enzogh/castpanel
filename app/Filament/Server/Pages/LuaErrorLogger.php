@@ -250,6 +250,11 @@ class LuaErrorLogger extends Page
      */
     public function monitorConsole(): void
     {
+        Log::info('Livewire: Polling triggered - monitoring console', [
+            'server_id' => $this->getServer()->id,
+            'timestamp' => now()->toISOString()
+        ]);
+        
         $this->startConsoleMonitoring();
     }
 
