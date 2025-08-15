@@ -226,13 +226,14 @@ class LuaErrorLogger extends Page
         // Convertir les erreurs de console en format de log standard
         $consoleLogs = [];
         foreach ($this->consoleErrors as $errorKey => $errorData) {
-            // Filtrer les erreurs de console fermées
-            if (($errorData['status'] ?? 'open') === 'closed' && ($errorData['closed_at'] ?? null) !== null) {
-                \Log::debug('Livewire: Skipping closed console error', [
+            // Filtrer strictement les erreurs de console avec status = 'open' et closed_at = null
+            if (($errorData['status'] ?? 'open') !== 'open' || ($errorData['closed_at'] ?? null) !== null) {
+                \Log::debug('Livewire: Skipping non-open console error', [
                     'server_id' => $this->getServer()->id,
                     'error_key' => $errorKey,
                     'status' => $errorData['status'] ?? 'unknown',
-                    'closed_at' => $errorData['closed_at'] ?? 'NULL'
+                    'closed_at' => $errorData['closed_at'] ?? 'NULL',
+                    'reason' => 'Status not open or closed_at not null'
                 ]);
                 continue;
             }
@@ -248,10 +249,11 @@ class LuaErrorLogger extends Page
             $consoleLogs[] = $error;
         }
         
-        \Log::info('Livewire: Console errors processed', [
+        \Log::info('Livewire: Console errors processed (open only)', [
             'server_id' => $this->getServer()->id,
-            'console_errors_count' => count($this->consoleErrors),
-            'console_logs_count' => count($consoleLogs),
+            'console_errors_total' => count($this->consoleErrors),
+            'console_logs_open_count' => count($consoleLogs),
+            'console_logs_filtered_out' => count($this->consoleErrors) - count($consoleLogs),
             'console_logs_details' => array_map(function($log) {
                 return [
                     'status' => $log['status'] ?? 'unknown',
@@ -277,16 +279,22 @@ class LuaErrorLogger extends Page
         }
         unset($log);
         
-        // Le filtrage des erreurs fermées est maintenant fait en base de données
-        // Pas besoin de filtrer côté frontend
+        // Filtrer strictement les erreurs avec status = 'open' et closed_at = null
+        $openLogs = array_filter($allLogs, function($log) {
+            return ($log['status'] ?? 'open') === 'open' && ($log['closed_at'] ?? null) === null;
+        });
         
-        \Log::info('Livewire: Logs prepared for display', [
+        \Log::info('Livewire: Logs filtered for open status only', [
             'server_id' => $this->getServer()->id,
             'stored_logs_count' => count($storedLogs),
             'console_logs_count' => count($consoleLogs),
             'total_logs' => count($allLogs),
-            'note' => 'Filtering done in database query (status = open only)'
+            'open_logs_count' => count($openLogs),
+            'note' => 'Frontend filtering: only status = open AND closed_at = null'
         ]);
+        
+        // Utiliser uniquement les erreurs ouvertes
+        $allLogs = $openLogs;
         
         // Regrouper les erreurs identiques par message et addon pour éviter les doublons
         $groupedLogs = [];
