@@ -65,6 +65,14 @@
                     
                     
             
+            <!-- Protection contre les erreurs de type -->
+            @php
+                // S'assurer que $logs est toujours un tableau
+                if (!is_array($logs)) {
+                    $logs = [];
+                }
+            @endphp
+            
             <!-- Surveillance automatique de la console -->
             <div class="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
                 <div class="flex items-center justify-between">
@@ -74,7 +82,14 @@
                         </svg>
                         <div>
                             <h3 class="text-sm font-medium text-blue-800 dark:text-blue-200">Surveillance de la console</h3>
-                            <p class="text-xs text-blue-600 dark:text-blue-400">Capture automatique des erreurs Lua [ERROR]</p>
+                            <p class="text-xs text-blue-600 dark:text-blue-400">
+                                Capture automatique des erreurs Lua [ERROR] 
+                                @if(is_array($logs))
+                                    ({{ count($logs) }} erreur(s) ouverte(s))
+                                @else
+                                    (Erreurs en cours de chargement...)
+                                @endif
+                            </p>
                         </div>
                     </div>
                     <button
@@ -118,7 +133,7 @@
                         
                         <!-- Corps du tableau -->
                         <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-                            @if(count($logs) > 0)
+                            @if(is_array($logs) && count($logs) > 0)
                                 @foreach($logs as $log)
                                     <tr class="hover:scale-[1.01] hover:shadow-sm transition-all duration-200 {{ $log['resolved'] ?? false ? 'opacity-60 bg-green-50 dark:bg-green-900/20' : '' }}">
                                         <!-- Première fois -->
