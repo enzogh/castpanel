@@ -2,7 +2,6 @@
 
 namespace App\Filament\Server\Pages;
 
-use App\Filament\Server\Pages\Concerns\HasServerContext;
 use App\Models\Server;
 use App\Services\Servers\LuaLogService;
 use Filament\Actions\Action;
@@ -14,8 +13,6 @@ use Livewire\Component;
 
 class LuaErrorLogger extends Page
 {
-    use HasServerContext;
-
     protected static string $resource = Server::class;
 
     protected static string $view = 'filament.server.pages.lua-error-logger';
