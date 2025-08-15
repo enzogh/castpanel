@@ -47,13 +47,10 @@ class ServerPanelProvider extends PanelProvider
             ])
             ->navigationGroups([
                 NavigationGroup::make('Gestion du serveur')
-                    ->icon('tabler-server')
                     ->collapsible(false),
                 NavigationGroup::make('Outils et surveillance')
-                    ->icon('tabler-tools')
                     ->collapsible(false),
                 NavigationGroup::make('Configuration')
-                    ->icon('tabler-settings')
                     ->collapsible(false),
             ])
             ->discoverResources(in: app_path('Filament/Server/Resources'), for: 'App\\Filament\\Server\\Resources')
