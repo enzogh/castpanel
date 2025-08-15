@@ -414,8 +414,8 @@ class LuaLogService
         }
 
         try {
-            // Récupérer seulement les erreurs non fermées (visibles)
-            $query = LuaError::forServer($server->id)->visible();
+            // Récupérer toutes les erreurs sans filtrage en base
+            $query = LuaError::forServer($server->id);
 
             // Appliquer les filtres
             if (isset($filters['resolved'])) {
@@ -440,7 +440,7 @@ class LuaLogService
 
             $logs = $query->orderBy('last_seen', 'desc')->get();
 
-            \Log::channel('lua')->info('Visible logs retrieved from database', [
+            \Log::channel('lua')->info('All logs retrieved from database (filtering will be done in frontend)', [
                 'server_id' => $server->id,
                 'logs_count' => $logs->count(),
                 'filters' => $filters
@@ -460,6 +460,7 @@ class LuaLogService
                     'status' => $log->status,
                     'resolved' => $log->resolved,
                     'resolved_at' => $log->resolved_at,
+                    'closed_at' => $log->closed_at,
                     'server_id' => $log->server_id,
                 ];
             })->toArray();
@@ -504,28 +505,7 @@ class LuaLogService
             // Créer un hash unique pour cette erreur
             $errorKey = md5($message . '|' . ($addon ?? 'unknown'));
 
-            // Vérifier si l'erreur existe déjà et n'est pas fermée
-            $existingError = LuaError::where('error_key', $errorKey)
-                ->where('server_id', $server->id)
-                ->whereNull('closed_at') // Seulement les erreurs non fermées
-                ->first();
-
-            if ($existingError) {
-                // L'erreur existe déjà, incrémenter le compteur et mettre à jour last_seen
-                $existingError->incrementCount();
-                $existingError->update(['last_seen' => now()]);
-
-                Log::channel('lua')->info('Lua error count incremented', [
-                    'server_id' => $server->id,
-                    'error_key' => $errorKey,
-                    'message' => $message,
-                    'addon' => $addon,
-                    'new_count' => $existingError->count,
-                ]);
-                return; // Ne pas créer de doublon
-            }
-
-            // Nouvelle erreur, la créer
+            // Créer directement l'erreur sans vérification en base
             $luaError = LuaError::create([
                 'server_id' => $server->id,
                 'error_key' => $errorKey,

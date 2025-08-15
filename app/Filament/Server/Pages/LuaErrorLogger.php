@@ -221,8 +221,19 @@ class LuaErrorLogger extends Page
                 if (!isset($log['resolved'])) {
                     $log['resolved'] = false;
                 }
+                if (!isset($log['status'])) {
+                    $log['status'] = 'open';
+                }
+                if (!isset($log['closed_at'])) {
+                    $log['closed_at'] = null;
+                }
             }
             unset($log);
+            
+            // Filtrer les erreurs fermées (status = 'closed' ET closed_at IS NOT NULL)
+            $allLogs = array_filter($allLogs, function($log) {
+                return !($log['status'] === 'closed' && $log['closed_at'] !== null);
+            });
             
             // Regrouper les erreurs identiques par message et addon pour éviter les doublons
             $groupedLogs = [];
@@ -279,10 +290,10 @@ class LuaErrorLogger extends Page
             }
             
             // Convertir en tableau indexé et trier par timestamp (plus récent en premier)
-            $finalLogs = array_values($groupedLogs);
-            usort($finalLogs, function($a, $b) {
-                $timestampA = $a['last_seen'] ?? $a['timestamp'] ?? '';
-                $timestampB = $b['last_seen'] ?? $b['timestamp'] ?? '';
+            $sortedLogs = array_values($groupedLogs);
+            usort($sortedLogs, function($a, $b) {
+                $timestampA = $a['last_seen'] ?? $a['timestamp'] ?? '1970-01-01';
+                $timestampB = $b['last_seen'] ?? $b['timestamp'] ?? '1970-01-01';
                 return strtotime($timestampB) - strtotime($timestampA);
             });
             
@@ -290,13 +301,14 @@ class LuaErrorLogger extends Page
                 'server_id' => $this->getServer()->id,
                 'stored_logs_count' => count($storedLogs),
                 'console_logs_count' => count($consoleLogs),
-                'grouped_logs_count' => count($finalLogs)
+                'grouped_logs_count' => count($sortedLogs)
             ]);
             
-            return $finalLogs;
+            return $sortedLogs;
+            
         } catch (\Exception $e) {
             \Log::error('Livewire: Error in getLogs', [
-                'server_id' => $this->getServer()->id ?? 'unknown',
+                'server_id' => $this->getServer()->id,
                 'error' => $e->getMessage()
             ]);
             return [];
@@ -474,31 +486,7 @@ class LuaErrorLogger extends Page
                     // Créer une clé unique pour cette erreur (basée sur le message et l'addon)
                     $errorKey = $this->createErrorKey($error);
                     
-                    // Vérifier si cette erreur existe déjà en base de données
-                    try {
-                        $existingError = \App\Models\LuaError::where('error_key', $errorKey)
-                            ->where('server_id', $this->getServer()->id)
-                            ->whereNull('closed_at') // Seulement les erreurs non fermées
-                            ->first();
-                        
-                        if ($existingError) {
-                            // L'erreur existe déjà, l'ignorer
-                            \Log::debug('Livewire: Skipping existing error from database', [
-                                'server_id' => $this->getServer()->id,
-                                'error_key' => $errorKey,
-                                'error_message' => $error['message'],
-                                'existing_count' => $existingError->count
-                            ]);
-                            continue;
-                        }
-                    } catch (\Exception $e) {
-                        \Log::warning('Livewire: Error checking database for existing error', [
-                            'server_id' => $this->getServer()->id,
-                            'error_key' => $errorKey,
-                            'error' => $e->getMessage()
-                        ]);
-                    }
-
+                    // Vérifier si cette erreur existe déjà en mémoire (consoleErrors)
                     if (isset($this->consoleErrors[$errorKey])) {
                         // Erreur déjà existante en mémoire, incrémenter le compteur seulement si elle n'est pas résolue
                         if (!($this->consoleErrors[$errorKey]['resolved'] ?? false)) {
@@ -525,7 +513,9 @@ class LuaErrorLogger extends Page
                             'count' => 1,
                             'first_seen' => now()->toISOString(),
                             'last_seen' => now()->toISOString(),
-                            'resolved' => false
+                            'resolved' => false,
+                            'status' => 'open',
+                            'closed_at' => null
                         ];
                         
                         \Log::info('Livewire: Adding new error to memory', [
