@@ -392,5 +392,30 @@
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
         });
+
+        // Écouter les événements de résolution/suppression
+        document.addEventListener('error-resolved', function(event) {
+            console.log('Error resolved:', event.detail);
+            // Forcer le refresh de Livewire
+            if (window.Livewire) {
+                window.Livewire.dispatch('refresh');
+            }
+        });
+
+        document.addEventListener('error-unresolved', function(event) {
+            console.log('Error unresolved:', event.detail);
+            // Forcer le refresh de Livewire
+            if (window.Livewire) {
+                window.Livewire.dispatch('refresh');
+            }
+        });
+
+        document.addEventListener('error-deleted', function(event) {
+            console.log('Error deleted:', event.detail);
+            // Forcer le refresh de Livewire
+            if (window.Livewire) {
+                window.Livewire.dispatch('refresh');
+            }
+        });
     </script>
 </x-filament-panels::page>

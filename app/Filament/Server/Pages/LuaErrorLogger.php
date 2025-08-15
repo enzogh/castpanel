@@ -553,6 +553,9 @@ class LuaErrorLogger extends Page
                 'error_key' => $errorKey,
                 'error_message' => $this->consoleErrors[$errorKey]['error']['message'] ?? 'unknown'
             ]);
+            
+            // Forcer la mise à jour de l'interface
+            $this->dispatch('error-resolved', ['error_key' => $errorKey]);
         } else {
             \Log::warning('Livewire: Error key not found in consoleErrors', [
                 'server_id' => $this->getServer()->id,
@@ -582,6 +585,9 @@ class LuaErrorLogger extends Page
                 'error_key' => $errorKey,
                 'error_message' => $this->consoleErrors[$errorKey]['error']['message'] ?? 'unknown'
             ]);
+            
+            // Forcer la mise à jour de l'interface
+            $this->dispatch('error-unresolved', ['error_key' => $errorKey]);
         } else {
             \Log::warning('Livewire: Error key not found in consoleErrors', [
                 'server_id' => $this->getServer()->id,
@@ -612,6 +618,9 @@ class LuaErrorLogger extends Page
                 'error_key' => $errorKey,
                 'error_message' => $errorMessage
             ]);
+            
+            // Forcer la mise à jour de l'interface
+            $this->dispatch('error-deleted', ['error_key' => $errorKey]);
         } else {
             \Log::warning('Livewire: Error key not found in consoleErrors for deletion', [
                 'server_id' => $this->getServer()->id,
