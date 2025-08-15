@@ -66,11 +66,34 @@ class LuaErrorLogger extends Page
         // Démarrer immédiatement la surveillance
         $this->startMonitoring();
         
-        // Initialiser les propriétés publiques
-        $this->stats = $this->getStats();
-        $this->logs = $this->getLogs();
-        $this->topAddonErrors = $this->getTopAddonErrors();
-        $this->topErrorTypes = $this->getTopErrorTypes();
+        // Initialiser les propriétés publiques avec des valeurs par défaut
+        try {
+            $this->stats = $this->getStats();
+        } catch (\Exception $e) {
+            \Log::error('Error getting stats', ['error' => $e->getMessage()]);
+            $this->stats = ['critical_errors' => 0, 'warnings' => 0, 'info' => 0, 'total' => 0];
+        }
+        
+        try {
+            $this->logs = $this->getLogs();
+        } catch (\Exception $e) {
+            \Log::error('Error getting logs', ['error' => $e->getMessage()]);
+            $this->logs = [];
+        }
+        
+        try {
+            $this->topAddonErrors = $this->getTopAddonErrors();
+        } catch (\Exception $e) {
+            \Log::error('Error getting top addon errors', ['error' => $e->getMessage()]);
+            $this->topAddonErrors = [];
+        }
+        
+        try {
+            $this->topErrorTypes = $this->getTopErrorTypes();
+        } catch (\Exception $e) {
+            \Log::error('Error getting top error types', ['error' => $e->getMessage()]);
+            $this->topErrorTypes = [];
+        }
         
         \Log::info('Livewire: Page mount completed', [
             'server_id' => $this->getServer()->id,
@@ -203,62 +226,93 @@ class LuaErrorLogger extends Page
 
     public function getStats(): array
     {
-        // Récupérer les stats des logs stockés
-        $storedStats = $this->getLuaLogService()->getLogStats($this->getServer());
-        
-        // Calculer les stats des erreurs de console en temps réel
-        $consoleStats = [
-            'critical_errors' => 0,
-            'warnings' => 0,
-            'info' => 0,
-            'total' => 0
-        ];
-        
-        foreach ($this->consoleErrors as $errorKey => $errorData) {
-            $error = $errorData['error'];
-            $level = $error['level'] ?? 'error';
+        try {
+            // Récupérer les stats des logs stockés
+            $storedStats = $this->getLuaLogService()->getLogStats($this->getServer());
             
-            switch ($level) {
-                case 'error':
-                    $consoleStats['critical_errors'] += $errorData['count'];
-                    break;
-                case 'warning':
-                    $consoleStats['warnings'] += $errorData['count'];
-                    break;
-                case 'info':
-                    $consoleStats['info'] += $errorData['count'];
-                    break;
+            // Vérifier que storedStats est un tableau
+            if (!is_array($storedStats)) {
+                \Log::warning('Livewire: getLogStats returned non-array', ['returned' => $storedStats]);
+                $storedStats = ['critical_errors' => 0, 'warnings' => 0, 'info' => 0, 'total' => 0];
             }
             
-            $consoleStats['total'] += $errorData['count'];
+            // Calculer les stats des erreurs de console en temps réel
+            $consoleStats = [
+                'critical_errors' => 0,
+                'warnings' => 0,
+                'info' => 0,
+                'total' => 0
+            ];
+            
+            foreach ($this->consoleErrors as $errorKey => $errorData) {
+                $error = $errorData['error'];
+                $level = $error['level'] ?? 'error';
+                
+                switch ($level) {
+                    case 'error':
+                        $consoleStats['critical_errors'] += $errorData['count'];
+                        break;
+                    case 'warning':
+                        $consoleStats['warnings'] += $errorData['count'];
+                        break;
+                    case 'info':
+                        $consoleStats['info'] += $errorData['count'];
+                        break;
+                }
+                
+                $consoleStats['total'] += $errorData['count'];
+            }
+            
+            // Combiner les stats avec vérification des clés
+            $combinedStats = [
+                'critical_errors' => ($storedStats['critical_errors'] ?? 0) + $consoleStats['critical_errors'],
+                'warnings' => ($storedStats['warnings'] ?? 0) + $consoleStats['warnings'],
+                'info' => ($storedStats['info'] ?? 0) + $consoleStats['info'],
+                'total' => ($storedStats['total'] ?? 0) + $consoleStats['total']
+            ];
+            
+            \Log::debug('Livewire: getStats called', [
+                'server_id' => $this->getServer()->id,
+                'stored_stats' => $storedStats,
+                'console_stats' => $consoleStats,
+                'combined_stats' => $combinedStats
+            ]);
+            
+            return $combinedStats;
+        } catch (\Exception $e) {
+            \Log::error('Livewire: Error in getStats', [
+                'server_id' => $this->getServer()->id ?? 'unknown',
+                'error' => $e->getMessage()
+            ]);
+            return [
+                'critical_errors' => 0,
+                'warnings' => 0,
+                'info' => 0,
+                'total' => 0
+            ];
         }
-        
-        // Combiner les stats
-        $combinedStats = [
-            'critical_errors' => $storedStats['critical_errors'] + $consoleStats['critical_errors'],
-            'warnings' => $storedStats['warnings'] + $consoleStats['warnings'],
-            'info' => $storedStats['info'] + $consoleStats['info'],
-            'total' => $storedStats['total'] + $consoleStats['total']
-        ];
-        
-        \Log::debug('Livewire: getStats computed property', [
-            'server_id' => $this->getServer()->id,
-            'stored_stats' => $storedStats,
-            'console_stats' => $consoleStats,
-            'combined_stats' => $combinedStats
-        ]);
-        
-        return $combinedStats;
     }
 
     public function getTopAddonErrors(): array
     {
-        return $this->getLuaLogService()->getTopAddonErrors($this->getServer(), 10);
+        try {
+            $result = $this->getLuaLogService()->getTopAddonErrors($this->getServer(), 10);
+            return is_array($result) ? $result : [];
+        } catch (\Exception $e) {
+            \Log::error('Livewire: Error in getTopAddonErrors', ['error' => $e->getMessage()]);
+            return [];
+        }
     }
 
     public function getTopErrorTypes(): array
     {
-        return $this->getLuaLogService()->getTopErrorTypes($this->getServer(), 10);
+        try {
+            $result = $this->getLuaLogService()->getTopErrorTypes($this->getServer(), 10);
+            return is_array($result) ? $result : [];
+        } catch (\Exception $e) {
+            \Log::error('Livewire: Error in getTopErrorTypes', ['error' => $e->getMessage()]);
+            return [];
+        }
     }
 
     public function refreshLogs(): void
