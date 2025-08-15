@@ -164,14 +164,26 @@
                                 {{ $log['level'] === 'error' ? 'border-red-500 bg-red-50 dark:bg-red-900/20' : 
                                    ($log['level'] === 'warning' ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20' : 
                                     'border-blue-500 bg-blue-50 dark:bg-blue-900/20') }}
-                                {{ in_array($log, $consoleErrors) ? 'ring-2 ring-blue-300 dark:ring-blue-600' : '' }}">
-                                @if(in_array($log, $consoleErrors))
+                                {{ isset($log['count']) ? 'ring-2 ring-blue-300 dark:ring-blue-600' : '' }}">
+                                @if(isset($log['count']) && $log['count'] > 1)
+                                    <div class="flex items-center justify-between mb-1">
+                                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
+                                            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                            </svg>
+                                            Erreur répétée ({{ $log['count'] }}x)
+                                        </span>
+                                        <span class="text-xs text-gray-500 dark:text-gray-400">
+                                            Première fois: {{ \Carbon\Carbon::parse($log['first_seen'])->format('H:i:s') }}
+                                        </span>
+                                    </div>
+                                @elseif(isset($log['count']) && $log['count'] === 1)
                                     <div class="flex items-center justify-between mb-1">
                                         <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
                                             <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                                             </svg>
-                                            Nouvelle erreur détectée
+                                            Nouvelle erreur
                                         </span>
                                     </div>
                                 @endif

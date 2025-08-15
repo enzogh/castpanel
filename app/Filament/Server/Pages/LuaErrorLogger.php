@@ -38,7 +38,8 @@ class LuaErrorLogger extends Page
     public $timeFilter = '24h';
     public $logsPaused = false;
     public $autoScroll = true;
-    public $consoleErrors = [];
+    public $consoleErrors = []; // Structure: ['error_key' => ['error' => {...}, 'count' => X, 'last_seen' => timestamp]]
+    public $lastConsoleCheck = null; // Timestamp de la dernière vérification de la console
 
     protected ?LuaLogService $luaLogService = null;
 
@@ -61,7 +62,10 @@ class LuaErrorLogger extends Page
             'server_id' => $this->getServer()->id
         ]);
         
-        // Première surveillance immédiate
+        // Initialiser le timestamp de la première vérification
+        $this->lastConsoleCheck = now()->toISOString();
+        
+        // Première surveillance immédiate (sans historique)
         $this->monitorConsole();
         
         // Programmer la surveillance toutes les 5 secondes
@@ -145,12 +149,24 @@ class LuaErrorLogger extends Page
 
         $storedLogs = $this->getLuaLogService()->getLogs($this->getServer(), $filters);
         
+        // Convertir les erreurs de console en format de log standard
+        $consoleLogs = [];
+        foreach ($this->consoleErrors as $errorKey => $errorData) {
+            $error = $errorData['error'];
+            $error['count'] = $errorData['count'];
+            $error['first_seen'] = $errorData['first_seen'];
+            $error['last_seen'] = $errorData['last_seen'];
+            $consoleLogs[] = $error;
+        }
+        
         // Combiner avec les erreurs de console en temps réel
-        $allLogs = array_merge($storedLogs, $this->consoleErrors);
+        $allLogs = array_merge($storedLogs, $consoleLogs);
         
         // Trier par timestamp (plus récent en premier)
         usort($allLogs, function($a, $b) {
-            return strtotime($b['timestamp']) - strtotime($a['timestamp']);
+            $timestampA = $a['last_seen'] ?? $a['timestamp'] ?? '';
+            $timestampB = $b['last_seen'] ?? $b['timestamp'] ?? '';
+            return strtotime($timestampB) - strtotime($timestampA);
         });
         
         \Log::channel('lua')->debug('Livewire: getLogs computed property completed', [
@@ -184,10 +200,11 @@ class LuaErrorLogger extends Page
     {
         \Log::channel('lua')->info('Livewire: refreshLogs called', [
             'server_id' => $this->getServer()->id,
-            'timestamp' => now()->toISOString()
+            'timestamp' => now()->toISOString(),
+            'last_check_time' => $this->lastConsoleCheck
         ]);
         
-        // Surveiller la console pour de nouvelles erreurs
+        // Surveiller la console pour de nouvelles erreurs (depuis la dernière vérification)
         $this->monitorConsole();
         $this->dispatch('logs-refreshed');
         
@@ -207,35 +224,50 @@ class LuaErrorLogger extends Page
         if (!$this->logsPaused) {
             \Log::channel('lua')->info('Livewire: Starting console monitoring', [
                 'server_id' => $this->getServer()->id,
-                'logs_paused' => $this->logsPaused
+                'logs_paused' => $this->logsPaused,
+                'last_check_time' => $this->lastConsoleCheck
             ]);
             
-            $newErrors = $this->getLuaLogService()->monitorConsole($this->getServer());
+            $newErrors = $this->getLuaLogService()->monitorConsole($this->getServer(), $this->lastConsoleCheck);
+            
+            // Mettre à jour le timestamp de la dernière vérification
+            $this->lastConsoleCheck = now()->toISOString();
             
             \Log::channel('lua')->info('Livewire: Console monitoring completed', [
                 'server_id' => $this->getServer()->id,
-                'new_errors_count' => count($newErrors)
+                'new_errors_count' => count($newErrors),
+                'new_check_time' => $this->lastConsoleCheck
             ]);
             
             foreach ($newErrors as $error) {
-                // Vérifier si l'erreur n'existe pas déjà
-                $exists = false;
-                foreach ($this->consoleErrors as $existingError) {
-                    if ($existingError['message'] === $error['message'] && 
-                        $existingError['timestamp'] === $error['timestamp']) {
-                        $exists = true;
-                        break;
-                    }
-                }
+                // Créer une clé unique pour cette erreur (basée sur le message et l'addon)
+                $errorKey = $this->createErrorKey($error);
                 
-                if (!$exists) {
+                if (isset($this->consoleErrors[$errorKey])) {
+                    // Erreur déjà existante, incrémenter le compteur
+                    $this->consoleErrors[$errorKey]['count']++;
+                    $this->consoleErrors[$errorKey]['last_seen'] = now()->toISOString();
+                    
+                    \Log::channel('lua')->info('Livewire: Incrementing error count', [
+                        'server_id' => $this->getServer()->id,
+                        'error_message' => $error['message'],
+                        'error_addon' => $error['addon'] ?? 'unknown',
+                        'new_count' => $this->consoleErrors[$errorKey]['count']
+                    ]);
+                } else {
+                    // Nouvelle erreur, l'ajouter avec un compteur initial
+                    $this->consoleErrors[$errorKey] = [
+                        'error' => $error,
+                        'count' => 1,
+                        'first_seen' => now()->toISOString(),
+                        'last_seen' => now()->toISOString()
+                    ];
+                    
                     \Log::channel('lua')->info('Livewire: Adding new error', [
                         'server_id' => $this->getServer()->id,
                         'error_message' => $error['message'],
                         'error_addon' => $error['addon'] ?? 'unknown'
                     ]);
-                    
-                    $this->consoleErrors[] = $error;
                     
                     // Sauvegarder l'erreur dans le fichier de log
                     $this->getLuaLogService()->addLog(
@@ -245,11 +277,6 @@ class LuaErrorLogger extends Page
                         $error['addon'],
                         $error['stack_trace']
                     );
-                } else {
-                    \Log::channel('lua')->debug('Livewire: Adding new error', [
-                        'server_id' => $this->getServer()->id,
-                        'error_message' => $error['message']
-                    ]);
                 }
             }
             
@@ -318,8 +345,20 @@ class LuaErrorLogger extends Page
         return match($format) {
             'csv' => 'text/csv',
             'txt' => 'text/plain',
-            default => 'application/json',
+            'default' => 'application/json',
         };
+    }
+
+    /**
+     * Crée une clé unique pour une erreur basée sur son message et son addon
+     */
+    private function createErrorKey(array $error): string
+    {
+        $message = $error['message'] ?? '';
+        $addon = $error['addon'] ?? 'unknown';
+        
+        // Créer une clé unique en combinant le message et l'addon
+        return md5($message . '|' . $addon);
     }
 
     protected function getHeaderActions(): array

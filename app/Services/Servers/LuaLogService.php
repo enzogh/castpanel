@@ -13,7 +13,7 @@ class LuaLogService
     /**
      * Surveille la console en temps réel et capture les erreurs Lua
      */
-    public function monitorConsole(Server $server): array
+    public function monitorConsole(Server $server, ?string $lastCheckTime = null): array
     {
         if (!$this->isGarrysModServer($server)) {
             Log::channel('lua')->info('Server is not Garry\'s Mod', ['server_id' => $server->id]);
@@ -21,10 +21,16 @@ class LuaLogService
         }
 
         try {
+            // Construire l'URL avec un paramètre de temps pour ne récupérer que les nouveaux logs
             $daemonUrl = $this->getDaemonUrl($server) . '/api/servers/' . $server->uuid . '/logs';
+            if ($lastCheckTime) {
+                $daemonUrl .= '?since=' . urlencode($lastCheckTime);
+            }
+            
             Log::channel('lua')->info('Monitoring console', [
                 'server_id' => $server->id,
-                'daemon_url' => $daemonUrl
+                'daemon_url' => $daemonUrl,
+                'last_check_time' => $lastCheckTime
             ]);
 
             // Récupérer le token d'authentification
@@ -52,7 +58,15 @@ class LuaLogService
                     'first_100_chars' => substr($consoleOutput, 0, 100)
                 ]);
                 
-                $errors = $this->parseConsoleForLuaErrors($consoleOutput);
+                // Parser la réponse JSON et extraire le contenu de la console
+                $parsedOutput = $this->parseDaemonResponse($consoleOutput);
+                Log::channel('lua')->info('Console output parsed', [
+                    'server_id' => $server->id,
+                    'parsed_length' => strlen($parsedOutput),
+                    'first_100_chars_parsed' => substr($parsedOutput, 0, 100)
+                ]);
+                
+                $errors = $this->parseConsoleForLuaErrors($parsedOutput);
                 Log::channel('lua')->info('Lua errors parsed', [
                     'server_id' => $server->id,
                     'errors_count' => count($errors)
@@ -75,6 +89,47 @@ class LuaLogService
         }
 
         return [];
+    }
+
+    /**
+     * Parse la réponse JSON du daemon et extrait le contenu de la console
+     */
+    private function parseDaemonResponse(string $responseBody): string
+    {
+        try {
+            $data = json_decode($responseBody, true);
+            
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                Log::channel('lua')->warning('Failed to parse JSON response', [
+                    'json_error' => json_last_error_msg(),
+                    'response_preview' => substr($responseBody, 0, 200)
+                ]);
+                return $responseBody; // Retourner le contenu brut si JSON invalide
+            }
+            
+            // Extraire le tableau 'data' qui contient les lignes de la console
+            if (isset($data['data']) && is_array($data['data'])) {
+                $consoleLines = $data['data'];
+                Log::channel('lua')->info('JSON response parsed successfully', [
+                    'data_lines_count' => count($consoleLines)
+                ]);
+                
+                // Joindre les lignes avec des retours à la ligne
+                return implode("\n", $consoleLines);
+            }
+            
+            Log::channel('lua')->warning('No data array found in JSON response', [
+                'response_keys' => array_keys($data ?? [])
+            ]);
+            return $responseBody;
+            
+        } catch (\Exception $e) {
+            Log::channel('lua')->error('Exception parsing daemon response', [
+                'error' => $e->getMessage(),
+                'response_preview' => substr($responseBody, 0, 200)
+            ]);
+            return $responseBody;
+        }
     }
 
     /**
