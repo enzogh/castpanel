@@ -53,7 +53,7 @@ class LuaErrorLogger extends Page
         }
         
         // Vérifier les permissions
-        return auth()->user()->can(\App\Enums\Permission::ACTION_FILE_READ, $server);
+        return auth()->user()->can(\App\Models\Permission::ACTION_FILE_READ, $server);
     }
 
     public static function getNavigationLabel(): string
