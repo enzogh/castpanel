@@ -242,16 +242,10 @@
                             <thead class="bg-gray-50 dark:bg-gray-800">
                                 <tr>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                        Statut
-                                    </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                         Première fois
                                     </th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                         Dernière fois
-                                    </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                        Compteur
                                     </th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                         Message d'erreur
@@ -268,42 +262,25 @@
                             <!-- Corps du tableau -->
                             <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
                                 @foreach($logs as $log)
-                                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors {{ $log['resolved'] ?? false ? 'opacity-60 bg-green-50 dark:bg-green-900/20' : '' }}">
-                                        <!-- Statut -->
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            @if($log['resolved'] ?? false)
-                                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                                                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                                                    </svg>
-                                                    Résolu
-                                                </span>
-                                            @else
-                                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium {{ $log['level'] === 'error' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' : ($log['level'] === 'warning' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200') }}">
-                                                    {{ ucfirst($log['level'] ?? 'info') }}
-                                                </span>
-                                            @endif
-                                        </td>
-                                        
+                                    <tr class="hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors {{ $log['resolved'] ?? false ? 'opacity-60 bg-green-50 dark:bg-green-900/20' : '' }}">
                                         <!-- Première fois -->
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                            {{ \Carbon\Carbon::parse($log['first_seen'] ?? $log['timestamp'])->format('H:i:s') }}
+                                            <div class="flex flex-col">
+                                                <span class="font-medium">{{ \Carbon\Carbon::parse($log['first_seen'] ?? $log['timestamp'])->format('H:i:s') }}</span>
+                                                @if(isset($log['count']) && $log['count'] > 1)
+                                                    <span class="text-xs text-orange-600 dark:text-orange-400 font-medium">{{ $log['count'] }}x</span>
+                                                @endif
+                                            </div>
                                         </td>
                                         
                                         <!-- Dernière fois -->
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                            {{ \Carbon\Carbon::parse($log['last_seen'] ?? $log['timestamp'])->format('H:i:s') }}
-                                        </td>
-                                        
-                                        <!-- Compteur -->
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            @if(isset($log['count']) && $log['count'] > 1)
-                                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
-                                                    {{ $log['count'] }}x
-                                                </span>
-                                            @else
-                                                <span class="text-sm text-gray-500 dark:text-gray-400">-</span>
-                                            @endif
+                                            <div class="flex flex-col">
+                                                <span class="font-medium">{{ \Carbon\Carbon::parse($log['last_seen'] ?? $log['timestamp'])->format('H:i:s') }}</span>
+                                                @if($log['resolved'] ?? false)
+                                                    <span class="text-xs text-green-600 dark:text-green-400 font-medium">✓ Résolu</span>
+                                                @endif
+                                            </div>
                                         </td>
                                         
                                         <!-- Message d'erreur -->
@@ -365,7 +342,7 @@
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                                                         </svg>
                                                         <svg wire:loading class="w-3 h-3 mr-1 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                                                         </svg>
                                                         Résoudre
                                                     </button>

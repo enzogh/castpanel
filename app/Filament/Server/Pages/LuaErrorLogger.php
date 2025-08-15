@@ -208,8 +208,20 @@ class LuaErrorLogger extends Page
             
             // Regrouper les erreurs identiques par message et addon pour éviter les doublons
             $groupedLogs = [];
+            $processedKeys = []; // Pour éviter de traiter plusieurs fois la même erreur
+            
             foreach ($allLogs as $log) {
                 $key = $this->createErrorKey($log);
+                
+                // Si cette clé a déjà été traitée, passer à la suivante
+                if (in_array($key, $processedKeys)) {
+                    \Log::debug('Livewire: Skipping duplicate key in grouping', [
+                        'server_id' => $this->getServer()->id,
+                        'error_key' => $key,
+                        'error_message' => $log['message'] ?? 'unknown'
+                    ]);
+                    continue;
+                }
                 
                 if (isset($groupedLogs[$key])) {
                     // Erreur déjà existante, incrémenter le compteur
@@ -236,6 +248,9 @@ class LuaErrorLogger extends Page
                     }
                     $groupedLogs[$key] = $log;
                 }
+                
+                // Marquer cette clé comme traitée
+                $processedKeys[] = $key;
             }
             
             // Filtrer les erreurs résolues si nécessaire
@@ -407,31 +422,61 @@ class LuaErrorLogger extends Page
                             'error_addon' => $error['addon'] ?? 'unknown',
                             'new_count' => $this->consoleErrors[$errorKey]['count']
                         ]);
+                    } else {
+                        \Log::debug('Livewire: Skipping resolved error', [
+                            'server_id' => $this->getServer()->id,
+                            'error_key' => $errorKey,
+                            'error_message' => $error['message']
+                        ]);
                     }
                 } else {
-                    // Nouvelle erreur, l'ajouter avec un compteur initial
-                    $this->consoleErrors[$errorKey] = [
-                        'error' => $error,
-                        'count' => 1,
-                        'first_seen' => now()->toISOString(),
-                        'last_seen' => now()->toISOString(),
-                        'resolved' => false
-                    ];
+                    // Vérifier si l'erreur n'existe pas déjà dans les logs stockés
+                    $existingLogs = $this->getLuaLogService()->getLogs($this->getServer(), []);
+                    $errorExists = false;
                     
-                    \Log::info('Livewire: Adding new error', [
-                        'server_id' => $this->getServer()->id,
-                        'error_message' => $error['message'],
-                        'error_addon' => $error['addon'] ?? 'unknown'
-                    ]);
+                    foreach ($existingLogs as $existingLog) {
+                        if ($this->createErrorKey($existingLog) === $errorKey) {
+                            $errorExists = true;
+                            \Log::debug('Livewire: Error already exists in stored logs', [
+                                'server_id' => $this->getServer()->id,
+                                'error_key' => $errorKey,
+                                'error_message' => $error['message']
+                            ]);
+                            break;
+                        }
+                    }
                     
-                    // Sauvegarder l'erreur dans le fichier de log
-                    $this->getLuaLogService()->addLog(
-                        $this->getServer(),
-                        $error['level'],
-                        $error['message'],
-                        $error['addon'],
-                        $error['stack_trace']
-                    );
+                    if (!$errorExists) {
+                        // Nouvelle erreur, l'ajouter avec un compteur initial
+                        $this->consoleErrors[$errorKey] = [
+                            'error' => $error,
+                            'count' => 1,
+                            'first_seen' => now()->toISOString(),
+                            'last_seen' => now()->toISOString(),
+                            'resolved' => false
+                        ];
+                        
+                        \Log::info('Livewire: Adding new error', [
+                            'server_id' => $this->getServer()->id,
+                            'error_message' => $error['message'],
+                            'error_addon' => $error['addon'] ?? 'unknown'
+                        ]);
+                        
+                        // Sauvegarder l'erreur dans le fichier de log
+                        $this->getLuaLogService()->addLog(
+                            $this->getServer(),
+                            $error['level'],
+                            $error['message'],
+                            $error['addon'],
+                            $error['stack_trace']
+                        );
+                    } else {
+                        \Log::info('Livewire: Skipping duplicate error from stored logs', [
+                            'server_id' => $this->getServer()->id,
+                            'error_key' => $errorKey,
+                            'error_message' => $error['message']
+                        ]);
+                    }
                 }
             }
             
@@ -439,6 +484,9 @@ class LuaErrorLogger extends Page
             if (count($this->consoleErrors) > 100) {
                 $this->consoleErrors = array_slice($this->consoleErrors, -100);
             }
+            
+            // Nettoyer les erreurs résolues anciennes
+            $this->cleanupResolvedErrors();
         } else {
             \Log::debug('Livewire: Console monitoring paused', [
                 'server_id' => $this->getServer()->id
@@ -533,6 +581,32 @@ class LuaErrorLogger extends Page
                 'server_id' => $this->getServer()->id,
                 'error_key' => $errorKey,
                 'error_message' => $errorMessage
+            ]);
+        }
+    }
+    
+    /**
+     * Nettoie les erreurs résolues anciennes pour éviter l'accumulation
+     */
+    public function cleanupResolvedErrors(): void
+    {
+        $cutoffTime = now()->subHours(24); // Supprimer les erreurs résolues de plus de 24h
+        $cleanedCount = 0;
+        
+        foreach ($this->consoleErrors as $errorKey => $errorData) {
+            if (($errorData['resolved'] ?? false) && 
+                isset($errorData['last_seen']) && 
+                strtotime($errorData['last_seen']) < $cutoffTime->timestamp()) {
+                
+                unset($this->consoleErrors[$errorKey]);
+                $cleanedCount++;
+            }
+        }
+        
+        if ($cleanedCount > 0) {
+            \Log::info('Livewire: Cleaned up resolved errors', [
+                'server_id' => $this->getServer()->id,
+                'cleaned_count' => $cleanedCount
             ]);
         }
     }
