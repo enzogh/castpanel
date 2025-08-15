@@ -342,14 +342,6 @@ class LuaErrorLogger extends Page
         ]);
         
         return $sortedLogs;
-        
-        } catch (\Exception $e) {
-            \Log::error('Livewire: Error in getLogs', [
-                'server_id' => $this->getServer()->id,
-                'error' => $e->getMessage()
-            ]);
-            return [];
-        }
     }
 
     public function getStats(): array
