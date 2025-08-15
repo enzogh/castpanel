@@ -134,4 +134,14 @@ Route::prefix('/servers/{server:uuid}')->middleware([ServerSubject::class, Authe
         Route::post('/reinstall', [Client\Servers\SettingsController::class, 'reinstall']);
         Route::put('/docker-image', [Client\Servers\SettingsController::class, 'dockerImage']);
     });
+
+    Route::prefix('/lua-logs')->group(function () {
+        Route::get('/', [App\Http\Controllers\Api\LuaLogController::class, 'getLogs']);
+        Route::post('/', [App\Http\Controllers\Api\LuaLogController::class, 'addLog']);
+        Route::delete('/', [App\Http\Controllers\Api\LuaLogController::class, 'clearLogs']);
+        Route::get('/export', [App\Http\Controllers\Api\LuaLogController::class, 'exportLogs']);
+        Route::get('/stats', [App\Http\Controllers\Api\LuaLogController::class, 'getStats']);
+        Route::get('/top-addons', [App\Http\Controllers\Api\LuaLogController::class, 'getTopAddonErrors']);
+        Route::get('/top-errors', [App\Http\Controllers\Api\LuaLogController::class, 'getTopErrorTypes']);
+    });
 });

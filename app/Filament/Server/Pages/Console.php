@@ -11,6 +11,7 @@ use App\Filament\Server\Widgets\ServerCpuChart;
 use App\Filament\Server\Widgets\ServerMemoryChart;
 use App\Filament\Server\Widgets\ServerNetworkChart;
 use App\Filament\Server\Widgets\ServerOverview;
+use App\Filament\Server\Widgets\LuaLogStatsWidget;
 use App\Livewire\AlertBanner;
 use App\Models\Permission;
 use App\Models\Server;
@@ -107,6 +108,13 @@ class Console extends Page
         $allWidgets = array_merge($allWidgets, static::$customWidgets[ConsoleWidgetPosition::Top->value] ?? []);
 
         $allWidgets[] = ServerOverview::class;
+
+        // Ajouter le widget des logs Lua pour les serveurs Garry's Mod
+        /** @var Server $server */
+        $server = Filament::getTenant();
+        if ($server->egg && $server->egg->name === 'Garrys Mod') {
+            $allWidgets[] = LuaLogStatsWidget::class;
+        }
 
         $allWidgets = array_merge($allWidgets, static::$customWidgets[ConsoleWidgetPosition::AboveConsole->value] ?? []);
 
