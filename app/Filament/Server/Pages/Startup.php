@@ -28,8 +28,6 @@ class Startup extends ServerFormPage
 
     protected static ?int $navigationSort = 21;
 
-    protected static string $view = 'filament.server.pages.startup';
-
     public static function getNavigationGroup(): ?string
     {
         return 'Configuration';

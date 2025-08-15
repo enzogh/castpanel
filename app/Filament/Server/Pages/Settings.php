@@ -26,8 +26,6 @@ class Settings extends ServerFormPage
 
     protected static ?int $navigationSort = 20;
 
-    protected static string $view = 'filament.server.pages.settings';
-
     public static function getNavigationGroup(): ?string
     {
         return 'Configuration';
