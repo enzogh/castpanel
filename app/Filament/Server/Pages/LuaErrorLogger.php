@@ -201,111 +201,148 @@ class LuaErrorLogger extends Page
         try {
             $storedLogs = $this->getLuaLogService()->getLogs($this->getServer(), $filters);
             
-            // Convertir les erreurs de console en format de log standard
-            $consoleLogs = [];
-            foreach ($this->consoleErrors as $errorKey => $errorData) {
-                $error = $errorData['error'];
-                $error['count'] = $errorData['count'];
-                $error['first_seen'] = $errorData['first_seen'];
-                $error['last_seen'] = $errorData['last_seen'];
-                $error['resolved'] = $errorData['resolved'] ?? false;
-                $error['error_key'] = $errorKey; // Ajouter la clé pour les actions
-                $consoleLogs[] = $error;
+            \Log::info('Livewire: Logs retrieved from service', [
+                'server_id' => $this->getServer()->id,
+                'stored_logs_count' => count($storedLogs),
+                'console_errors_count' => count($this->consoleErrors)
+            ]);
+            
+        } catch (\Exception $e) {
+            \Log::warning('Livewire: Cannot access database, using only console errors', [
+                'server_id' => $this->getServer()->id,
+                'error' => $e->getMessage()
+            ]);
+            
+            $storedLogs = [];
+        }
+            
+        // Convertir les erreurs de console en format de log standard
+        $consoleLogs = [];
+        foreach ($this->consoleErrors as $errorKey => $errorData) {
+            $error = $errorData['error'];
+            $error['count'] = $errorData['count'];
+            $error['first_seen'] = $errorData['first_seen'];
+            $error['last_seen'] = $errorData['last_seen'];
+            $error['resolved'] = $errorData['resolved'] ?? false;
+            $error['error_key'] = $errorKey; // Ajouter la clé pour les actions
+            $consoleLogs[] = $error;
+        }
+        
+        // Combiner les logs stockés avec les erreurs de console
+        $allLogs = array_merge($storedLogs, $consoleLogs);
+        
+        // S'assurer que tous les logs ont les propriétés nécessaires
+        foreach ($allLogs as &$log) {
+            if (!isset($log['resolved'])) {
+                $log['resolved'] = false;
+            }
+            if (!isset($log['status'])) {
+                $log['status'] = 'open';
+            }
+            if (!isset($log['closed_at'])) {
+                $log['closed_at'] = null;
+            }
+        }
+        unset($log);
+        
+        // Filtrer les erreurs fermées (status = 'closed' ET closed_at IS NOT NULL)
+        $allLogs = array_filter($allLogs, function($log) {
+            $shouldHide = ($log['status'] === 'closed' && $log['closed_at'] !== null);
+            
+            \Log::debug('Livewire: Filtering log', [
+                'server_id' => $this->getServer()->id,
+                'log_id' => $log['id'] ?? 'unknown',
+                'status' => $log['status'] ?? 'unknown',
+                'closed_at' => $log['closed_at'] ?? 'NULL',
+                'should_hide' => $shouldHide,
+                'message' => substr($log['message'] ?? 'unknown', 0, 50)
+            ]);
+            
+            return !$shouldHide;
+        });
+        
+        \Log::info('Livewire: Filtering completed', [
+            'server_id' => $this->getServer()->id,
+            'total_logs_before_filter' => count($allLogs) + count(array_filter($allLogs, function($log) {
+                return ($log['status'] === 'closed' && $log['closed_at'] !== null);
+            })),
+            'visible_logs_after_filter' => count($allLogs),
+            'hidden_logs' => count(array_filter($allLogs, function($log) {
+                return ($log['status'] === 'closed' && $log['closed_at'] !== null);
+            }))
+        ]);
+        
+        // Regrouper les erreurs identiques par message et addon pour éviter les doublons
+        $groupedLogs = [];
+        $processedKeys = []; // Pour éviter de traiter plusieurs fois la même erreur
+        
+        foreach ($allLogs as $log) {
+            $key = $this->createErrorKey($log);
+            
+            // Si cette clé a déjà été traitée, passer à la suivante
+            if (in_array($key, $processedKeys)) {
+                \Log::debug('Livewire: Skipping duplicate key in grouping', [
+                    'server_id' => $this->getServer()->id,
+                    'error_key' => $key,
+                    'error_message' => $log['message'] ?? 'unknown'
+                ]);
+                continue;
             }
             
-            // Combiner les logs stockés avec les erreurs de console
-            $allLogs = array_merge($storedLogs, $consoleLogs);
-            
-            // S'assurer que tous les logs ont les propriétés nécessaires
-            foreach ($allLogs as &$log) {
+            if (isset($groupedLogs[$key])) {
+                // Erreur déjà existante, incrémenter le compteur
+                $groupedLogs[$key]['count'] = ($groupedLogs[$key]['count'] ?? 1) + ($log['count'] ?? 1);
+                $groupedLogs[$key]['last_seen'] = $log['last_seen'] ?? $log['timestamp'];
+                // Garder le timestamp le plus récent
+                if (isset($log['timestamp']) && (!isset($groupedLogs[$key]['timestamp']) || strtotime($log['timestamp']) > strtotime($groupedLogs[$key]['timestamp']))) {
+                    $groupedLogs[$key]['timestamp'] = $log['timestamp'];
+                }
+                // Préserver l'error_key si disponible
+                if (isset($log['error_key']) && !isset($groupedLogs[$key]['error_key'])) {
+                    $groupedLogs[$key]['error_key'] = $log['error_key'];
+                }
+            } else {
+                // Nouvelle erreur, l'ajouter
+                $log['count'] = $log['count'] ?? 1;
+                $log['first_seen'] = $log['first_seen'] ?? $log['timestamp'];
+                // S'assurer que tous les logs ont une clé d'action et une propriété resolved
+                if (!isset($log['error_key'])) {
+                    $log['error_key'] = $key;
+                }
                 if (!isset($log['resolved'])) {
                     $log['resolved'] = false;
                 }
-                if (!isset($log['status'])) {
-                    $log['status'] = 'open';
-                }
-                if (!isset($log['closed_at'])) {
-                    $log['closed_at'] = null;
-                }
+                $groupedLogs[$key] = $log;
             }
-            unset($log);
             
-            // Filtrer les erreurs fermées (status = 'closed' ET closed_at IS NOT NULL)
-            $allLogs = array_filter($allLogs, function($log) {
-                return !($log['status'] === 'closed' && $log['closed_at'] !== null);
+            // Marquer cette clé comme traitée
+            $processedKeys[] = $key;
+        }
+        
+        // Filtrer les erreurs résolues si nécessaire
+        if (!$this->showResolved) {
+            $groupedLogs = array_filter($groupedLogs, function($log) {
+                return !($log['resolved'] ?? false);
             });
-            
-            // Regrouper les erreurs identiques par message et addon pour éviter les doublons
-            $groupedLogs = [];
-            $processedKeys = []; // Pour éviter de traiter plusieurs fois la même erreur
-            
-            foreach ($allLogs as $log) {
-                $key = $this->createErrorKey($log);
-                
-                // Si cette clé a déjà été traitée, passer à la suivante
-                if (in_array($key, $processedKeys)) {
-                    \Log::debug('Livewire: Skipping duplicate key in grouping', [
-                        'server_id' => $this->getServer()->id,
-                        'error_key' => $key,
-                        'error_message' => $log['message'] ?? 'unknown'
-                    ]);
-                    continue;
-                }
-                
-                if (isset($groupedLogs[$key])) {
-                    // Erreur déjà existante, incrémenter le compteur
-                    $groupedLogs[$key]['count'] = ($groupedLogs[$key]['count'] ?? 1) + ($log['count'] ?? 1);
-                    $groupedLogs[$key]['last_seen'] = $log['last_seen'] ?? $log['timestamp'];
-                    // Garder le timestamp le plus récent
-                    if (isset($log['timestamp']) && (!isset($groupedLogs[$key]['timestamp']) || strtotime($log['timestamp']) > strtotime($groupedLogs[$key]['timestamp']))) {
-                        $groupedLogs[$key]['timestamp'] = $log['timestamp'];
-                    }
-                    // Préserver l'error_key si disponible
-                    if (isset($log['error_key']) && !isset($groupedLogs[$key]['error_key'])) {
-                        $groupedLogs[$key]['error_key'] = $log['error_key'];
-                    }
-                } else {
-                    // Nouvelle erreur, l'ajouter
-                    $log['count'] = $log['count'] ?? 1;
-                    $log['first_seen'] = $log['first_seen'] ?? $log['timestamp'];
-                    // S'assurer que tous les logs ont une clé d'action et une propriété resolved
-                    if (!isset($log['error_key'])) {
-                        $log['error_key'] = $key;
-                    }
-                    if (!isset($log['resolved'])) {
-                        $log['resolved'] = false;
-                    }
-                    $groupedLogs[$key] = $log;
-                }
-                
-                // Marquer cette clé comme traitée
-                $processedKeys[] = $key;
-            }
-            
-            // Filtrer les erreurs résolues si nécessaire
-            if (!$this->showResolved) {
-                $groupedLogs = array_filter($groupedLogs, function($log) {
-                    return !($log['resolved'] ?? false);
-                });
-            }
-            
-            // Convertir en tableau indexé et trier par timestamp (plus récent en premier)
-            $sortedLogs = array_values($groupedLogs);
-            usort($sortedLogs, function($a, $b) {
-                $timestampA = $a['last_seen'] ?? $a['timestamp'] ?? '1970-01-01';
-                $timestampB = $b['last_seen'] ?? $b['timestamp'] ?? '1970-01-01';
-                return strtotime($timestampB) - strtotime($timestampA);
-            });
-            
-            \Log::debug('Livewire: getLogs computed property completed', [
-                'server_id' => $this->getServer()->id,
-                'stored_logs_count' => count($storedLogs),
-                'console_logs_count' => count($consoleLogs),
-                'grouped_logs_count' => count($sortedLogs)
-            ]);
-            
-            return $sortedLogs;
-            
+        }
+        
+        // Convertir en tableau indexé et trier par timestamp (plus récent en premier)
+        $sortedLogs = array_values($groupedLogs);
+        usort($sortedLogs, function($a, $b) {
+            $timestampA = $a['last_seen'] ?? $a['timestamp'] ?? '1970-01-01';
+            $timestampB = $b['last_seen'] ?? $b['timestamp'] ?? '1970-01-01';
+            return strtotime($timestampB) - strtotime($timestampA);
+        });
+        
+        \Log::debug('Livewire: getLogs computed property completed', [
+            'server_id' => $this->getServer()->id,
+            'stored_logs_count' => count($storedLogs),
+            'console_logs_count' => count($consoleLogs),
+            'grouped_logs_count' => count($sortedLogs)
+        ]);
+        
+        return $sortedLogs;
+        
         } catch (\Exception $e) {
             \Log::error('Livewire: Error in getLogs', [
                 'server_id' => $this->getServer()->id,
