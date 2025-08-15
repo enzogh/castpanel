@@ -1,59 +1,113 @@
 <x-filament-panels::page class="fi-lua-error-logger-page">
     <div class="space-y-6">
         <!-- Statistiques des erreurs -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700">
-                <div class="flex items-center">
-                    <div class="p-2 bg-red-100 dark:bg-red-900/20 rounded-lg">
-                        <svg class="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                        </svg>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <!-- En-tête des statistiques -->
+            <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
+                            <svg class="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Vue d'ensemble des erreurs</h2>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Statistiques en temps réel de votre serveur</p>
+                        </div>
                     </div>
-                    <div class="ml-3">
-                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Erreurs critiques</p>
-                        <p class="text-2xl font-semibold text-gray-900 dark:text-white">{{ $stats['critical_errors'] ?? 0 }}</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700">
-                <div class="flex items-center">
-                    <div class="p-2 bg-yellow-100 dark:bg-yellow-900/20 rounded-lg">
-                        <svg class="w-6 h-6 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                        </svg>
-                    </div>
-                    <div class="ml-3">
-                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Avertissements</p>
-                        <p class="text-2xl font-semibold text-gray-900 dark:text-white">{{ $stats['warnings'] ?? 0 }}</p>
+                    <div class="flex items-center space-x-2">
+                        <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                        <span class="text-sm text-green-600 dark:text-green-400 font-medium">En direct</span>
                     </div>
                 </div>
             </div>
+            
+            <!-- Grille des statistiques -->
+            <div class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <!-- Erreurs critiques -->
+                    <div class="relative group">
+                        <div class="bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 rounded-xl p-6 border border-red-200 dark:border-red-700/50 transition-all duration-200 group-hover:shadow-lg group-hover:scale-105">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="p-3 bg-red-100 dark:bg-red-900/30 rounded-lg">
+                                    <svg class="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                                    </svg>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-3xl font-bold text-red-600 dark:text-red-400">{{ $stats['critical_errors'] ?? 0 }}</p>
+                                    <p class="text-xs text-red-500 dark:text-red-400 font-medium">Erreurs</p>
+                                </div>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-sm font-semibold text-red-800 dark:text-red-300">Erreurs critiques</p>
+                                <p class="text-xs text-red-600 dark:text-red-400 mt-1">Problèmes nécessitant une attention immédiate</p>
+                            </div>
+                        </div>
+                    </div>
 
-            <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700">
-                <div class="flex items-center">
-                    <div class="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
-                        <svg class="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
+                    <!-- Avertissements -->
+                    <div class="relative group">
+                        <div class="bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-900/20 dark:to-yellow-800/20 rounded-xl p-6 border border-yellow-200 dark:border-yellow-700/50 transition-all duration-200 group-hover:shadow-lg group-hover:scale-105">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
+                                    <svg class="w-6 h-6 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                                    </svg>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-3xl font-bold text-yellow-600 dark:text-yellow-400">{{ $stats['warnings'] ?? 0 }}</p>
+                                    <p class="text-xs text-yellow-500 dark:text-yellow-400 font-medium">Avertissements</p>
+                                </div>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-sm font-semibold text-yellow-800 dark:text-yellow-300">Avertissements</p>
+                                <p class="text-xs text-yellow-600 dark:text-yellow-400 mt-1">Problèmes à surveiller</p>
+                            </div>
+                        </div>
                     </div>
-                    <div class="ml-3">
-                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Informations</p>
-                        <p class="text-2xl font-semibold text-gray-900 dark:text-white">{{ $stats['info'] ?? 0 }}</p>
-                    </div>
-                </div>
-            </div>
 
-            <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700">
-                <div class="flex items-center">
-                    <div class="p-2 bg-green-100 dark:bg-green-900/20 rounded-lg">
-                        <svg class="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
+                    <!-- Informations -->
+                    <div class="relative group">
+                        <div class="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-xl p-6 border border-blue-200 dark:border-blue-700/50 transition-all duration-200 group-hover:shadow-lg group-hover:scale-105">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                                    <svg class="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-3xl font-bold text-blue-600 dark:text-blue-400">{{ $stats['info'] ?? 0 }}</p>
+                                    <p class="text-xs text-blue-500 dark:text-blue-400 font-medium">Infos</p>
+                                </div>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-sm font-semibold text-blue-800 dark:text-blue-300">Informations</p>
+                                <p class="text-xs text-blue-600 dark:text-blue-400 mt-1">Messages informatifs</p>
+                            </div>
+                        </div>
                     </div>
-                    <div class="ml-3">
-                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total</p>
-                        <p class="text-2xl font-semibold text-gray-900 dark:text-white">{{ $stats['total'] ?? 0 }}</p>
+
+                    <!-- Total -->
+                    <div class="relative group">
+                        <div class="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-xl p-6 border border-green-200 dark:border-green-700/50 transition-all duration-200 group-hover:shadow-lg group-hover:scale-105">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                                    <svg class="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-3xl font-bold text-green-600 dark:text-green-400">{{ $stats['total'] ?? 0 }}</p>
+                                    <p class="text-xs text-green-500 dark:text-green-400 font-medium">Total</p>
+                                </div>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-sm font-semibold text-green-800 dark:text-green-300">Total des logs</p>
+                                <p class="text-xs text-green-600 dark:text-green-400 mt-1">Tous les événements collectés</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -148,7 +202,7 @@
                     @if(count($logs) > 0)
                         <div class="divide-y divide-gray-200 dark:divide-gray-700">
                             @foreach($logs as $log)
-                                <div class="p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors {{ isset($log['count']) ? 'ring-2 ring-blue-300 dark:ring-blue-600' : '' }}">
+                                <div class="p-4 hover:bg-gray-700/50 dark:hover:bg-gray-600/50 transition-colors {{ isset($log['count']) ? 'ring-2 ring-blue-300 dark:ring-blue-600' : '' }}">
                                     @if(isset($log['count']) && $log['count'] > 1)
                                         <div class="flex items-center justify-between mb-1">
                                             <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
@@ -219,42 +273,7 @@
             </div>
         </div>
 
-        <!-- Analyse des erreurs -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <!-- Top des addons avec erreurs -->
-            <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700">
-                <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Top des addons avec erreurs</h3>
-                @if(count($topAddonErrors) > 0)
-                    <div class="space-y-3">
-                        @foreach($topAddonErrors as $addon)
-                            <div class="flex items-center justify-between">
-                                <span class="text-sm text-gray-700 dark:text-gray-300">{{ $addon['addon'] }}</span>
-                                <span class="text-sm font-medium text-gray-900 dark:text-white">{{ $addon['count'] }}</span>
-                            </div>
-                        @endforeach
-                    </div>
-                @else
-                    <p class="text-sm text-gray-500 dark:text-gray-400">Aucune donnée disponible</p>
-                @endif
-            </div>
 
-            <!-- Top des types d'erreurs -->
-            <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700">
-                <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Top des types d'erreurs</h3>
-                @if(count($topErrorTypes) > 0)
-                    <div class="space-y-3">
-                        @foreach($topErrorTypes as $errorType)
-                            <div class="flex items-center justify-between">
-                                <span class="text-sm text-gray-700 dark:text-gray-300">{{ $errorType['type'] }}</span>
-                                <span class="text-sm font-medium text-gray-900 dark:text-white">{{ $errorType['count'] }}</span>
-                            </div>
-                        @endforeach
-                    </div>
-                @else
-                    <p class="text-sm text-gray-500 dark:text-gray-400">Aucune donnée disponible</p>
-                @endif
-            </div>
-        </div>
     </div>
 
     <script>

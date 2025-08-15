@@ -49,8 +49,6 @@ class LuaErrorLogger extends Page
         'total' => 0
     ];
     public array $logs = [];
-    public array $topAddonErrors = [];
-    public array $topErrorTypes = [];
 
     protected ?LuaLogService $luaLogService = null;
 
@@ -81,19 +79,7 @@ class LuaErrorLogger extends Page
             $this->logs = [];
         }
         
-        try {
-            $this->topAddonErrors = $this->getTopAddonErrors();
-        } catch (\Exception $e) {
-            \Log::error('Error getting top addon errors', ['error' => $e->getMessage()]);
-            $this->topAddonErrors = [];
-        }
-        
-        try {
-            $this->topErrorTypes = $this->getTopErrorTypes();
-        } catch (\Exception $e) {
-            \Log::error('Error getting top error types', ['error' => $e->getMessage()]);
-            $this->topErrorTypes = [];
-        }
+
         
         \Log::info('Livewire: Page mount completed', [
             'server_id' => $this->getServer()->id,
@@ -174,7 +160,6 @@ class LuaErrorLogger extends Page
         return $server;
     }
 
-    #[Computed]
     public function getLogs(): array
     {
         \Log::debug('Livewire: getLogs computed property called', [
@@ -193,35 +178,66 @@ class LuaErrorLogger extends Page
             'time' => $this->timeFilter,
         ];
 
-        $storedLogs = $this->getLuaLogService()->getLogs($this->getServer(), $filters);
-        
-        // Convertir les erreurs de console en format de log standard
-        $consoleLogs = [];
-        foreach ($this->consoleErrors as $errorKey => $errorData) {
-            $error = $errorData['error'];
-            $error['count'] = $errorData['count'];
-            $error['first_seen'] = $errorData['first_seen'];
-            $error['last_seen'] = $errorData['last_seen'];
-            $consoleLogs[] = $error;
+        try {
+            $storedLogs = $this->getLuaLogService()->getLogs($this->getServer(), $filters);
+            
+            // Convertir les erreurs de console en format de log standard
+            $consoleLogs = [];
+            foreach ($this->consoleErrors as $errorKey => $errorData) {
+                $error = $errorData['error'];
+                $error['count'] = $errorData['count'];
+                $error['first_seen'] = $errorData['first_seen'];
+                $error['last_seen'] = $errorData['last_seen'];
+                $consoleLogs[] = $error;
+            }
+            
+            // Combiner avec les erreurs de console en temps réel
+            $allLogs = array_merge($storedLogs, $consoleLogs);
+            
+            // Regrouper les erreurs identiques par message et addon
+            $groupedLogs = [];
+            foreach ($allLogs as $log) {
+                $key = $this->createErrorKey($log);
+                
+                if (isset($groupedLogs[$key])) {
+                    // Erreur déjà existante, incrémenter le compteur
+                    $groupedLogs[$key]['count']++;
+                    $groupedLogs[$key]['last_seen'] = $log['last_seen'] ?? $log['timestamp'];
+                    // Garder le timestamp le plus récent
+                    if (isset($log['timestamp']) && (!isset($groupedLogs[$key]['timestamp']) || strtotime($log['timestamp']) > strtotime($groupedLogs[$key]['timestamp']))) {
+                        $groupedLogs[$key]['timestamp'] = $log['timestamp'];
+                    }
+                } else {
+                    // Nouvelle erreur, l'ajouter
+                    $log['count'] = 1;
+                    $log['first_seen'] = $log['timestamp'];
+                    $groupedLogs[$key] = $log;
+                }
+            }
+            
+            // Convertir en tableau indexé et trier par timestamp (plus récent en premier)
+            $finalLogs = array_values($groupedLogs);
+            usort($finalLogs, function($a, $b) {
+                $timestampA = $a['last_seen'] ?? $a['timestamp'] ?? '';
+                $timestampB = $b['last_seen'] ?? $b['timestamp'] ?? '';
+                return strtotime($timestampB) - strtotime($timestampA);
+            });
+            
+            \Log::debug('Livewire: getLogs computed property completed', [
+                'server_id' => $this->getServer()->id,
+                'stored_logs_count' => count($storedLogs),
+                'console_logs_count' => count($consoleLogs),
+                'grouped_logs_count' => count($finalLogs)
+            ]);
+            
+            return $finalLogs;
+        } catch (\Exception $e) {
+            \Log::error('Livewire: Error in getLogs', [
+                'server_id' => $this->getServer()->id ?? 'unknown',
+                'error' => $e->getMessage()
+            ]);
+            return [];
         }
-        
-        // Combiner avec les erreurs de console en temps réel
-        $allLogs = array_merge($storedLogs, $consoleLogs);
-        
-        // Trier par timestamp (plus récent en premier)
-        usort($allLogs, function($a, $b) {
-            $timestampA = $a['last_seen'] ?? $a['timestamp'] ?? '';
-            $timestampB = $b['last_seen'] ?? $b['timestamp'] ?? '';
-            return strtotime($timestampB) - strtotime($timestampA);
-        });
-        
-        \Log::debug('Livewire: getLogs computed property completed', [
-            'server_id' => $this->getServer()->id,
-            'stored_logs_count' => count($storedLogs),
-            'total_logs_count' => count($allLogs)
-        ]);
-        
-        return $allLogs;
     }
 
     public function getStats(): array
@@ -293,51 +309,7 @@ class LuaErrorLogger extends Page
         }
     }
 
-    public function getTopAddonErrors(): array
-    {
-        try {
-            $result = $this->getLuaLogService()->getTopAddonErrors($this->getServer(), 10);
-            if (!is_array($result)) {
-                return [];
-            }
-            
-            // Transformer le format ['addon_name' => count] en [['addon' => 'name', 'count' => X]]
-            $transformed = [];
-            foreach ($result as $addon => $count) {
-                $transformed[] = [
-                    'addon' => $addon,
-                    'count' => $count
-                ];
-            }
-            return $transformed;
-        } catch (\Exception $e) {
-            \Log::error('Livewire: Error in getTopAddonErrors', ['error' => $e->getMessage()]);
-            return [];
-        }
-    }
 
-    public function getTopErrorTypes(): array
-    {
-        try {
-            $result = $this->getLuaLogService()->getTopErrorTypes($this->getServer(), 10);
-            if (!is_array($result)) {
-                return [];
-            }
-            
-            // Transformer le format ['error_type' => count] en [['type' => 'error_type', 'count' => X]]
-            $transformed = [];
-            foreach ($result as $type => $count) {
-                $transformed[] = [
-                    'type' => $type,
-                    'count' => $count
-                ];
-            }
-            return $transformed;
-        } catch (\Exception $e) {
-            \Log::error('Livewire: Error in getTopErrorTypes', ['error' => $e->getMessage()]);
-            return [];
-        }
-    }
 
     public function refreshLogs(): void
     {
