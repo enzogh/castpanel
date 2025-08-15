@@ -61,28 +61,40 @@
             <!-- Tableau des logs -->
             <div class="p-4">
                 <div class="overflow-x-auto">
-                    @if(count($logs) > 0)
-                        <table class="w-full divide-y divide-gray-200 dark:divide-gray-700">
-                            <!-- En-tête du tableau -->
-                            <thead class="bg-gray-50 dark:bg-gray-800">
-                                <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-32">
-                                        Première fois
-                                    </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-32">
-                                        Dernière fois
-                                    </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                        Message d'erreur
-                                    </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-48">
-                                        Actions
-                                    </th>
-                                </tr>
-                            </thead>
-                            
-                            <!-- Corps du tableau -->
-                            <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                    <!-- Debug info pour voir ce qui se passe -->
+                    <div class="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
+                        <div class="text-sm text-blue-800 dark:text-blue-200">
+                            <strong>Debug:</strong> 
+                            Nombre d'erreurs dans $logs: {{ count($logs) }}
+                            @if(count($logs) > 0)
+                                <br>Première erreur: {{ $logs[0]['message'] ?? 'N/A' }} (Status: {{ $logs[0]['status'] ?? 'N/A' }})
+                            @endif
+                        </div>
+                    </div>
+                    
+                    <!-- Tableau toujours visible -->
+                    <table class="w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <!-- En-tête du tableau -->
+                        <thead class="bg-gray-50 dark:bg-gray-800">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-32">
+                                    Première fois
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-32">
+                                    Dernière fois
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                    Message d'erreur
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-48">
+                                    Actions
+                                </th>
+                            </tr>
+                        </thead>
+                        
+                        <!-- Corps du tableau -->
+                        <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                            @if(count($logs) > 0)
                                 @foreach($logs as $log)
                                     <tr class="hover:scale-[1.01] hover:shadow-sm transition-all duration-200 {{ $log['resolved'] ?? false ? 'opacity-60 bg-green-50 dark:bg-green-900/20' : '' }}">
                                         <!-- Première fois -->
@@ -173,21 +185,24 @@
                                         </td>
                                     </tr>
                                 @endforeach
-                            </tbody>
-                        </table>
-                    @else
-                        <div class="p-8 text-center">
-                            <div class="mx-auto w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
-                                <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                </svg>
-                            </div>
-                            <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">Aucun log trouvé</h3>
-                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                                Aucune erreur Lua n'a été détectée pour le moment.
-                            </p>
-                        </div>
-                    @endif
+                            @else
+                                <!-- Ligne vide quand pas d'erreurs -->
+                                <tr>
+                                    <td colspan="4" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                                        <div class="flex flex-col items-center">
+                                            <svg class="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                            </svg>
+                                            <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">Aucune erreur ouverte trouvée</h3>
+                                            <p class="text-sm text-gray-500 dark:text-gray-400">
+                                                Toutes les erreurs sont fermées ou résolues.
+                                            </p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endif
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>

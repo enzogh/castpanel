@@ -204,7 +204,14 @@ class LuaErrorLogger extends Page
             \Log::info('Livewire: Logs retrieved from service', [
                 'server_id' => $this->getServer()->id,
                 'stored_logs_count' => count($storedLogs),
-                'console_errors_count' => count($this->consoleErrors)
+                'console_errors_count' => count($this->consoleErrors),
+                'stored_logs_details' => array_map(function($log) {
+                    return [
+                        'id' => $log['id'] ?? 'unknown',
+                        'status' => $log['status'] ?? 'unknown',
+                        'message' => substr($log['message'] ?? 'unknown', 0, 50)
+                    ];
+                }, $storedLogs)
             ]);
             
         } catch (\Exception $e) {
@@ -240,6 +247,18 @@ class LuaErrorLogger extends Page
             $error['error_key'] = $errorKey; // Ajouter la clé pour les actions
             $consoleLogs[] = $error;
         }
+        
+        \Log::info('Livewire: Console errors processed', [
+            'server_id' => $this->getServer()->id,
+            'console_errors_count' => count($this->consoleErrors),
+            'console_logs_count' => count($consoleLogs),
+            'console_logs_details' => array_map(function($log) {
+                return [
+                    'status' => $log['status'] ?? 'unknown',
+                    'message' => substr($log['message'] ?? 'unknown', 0, 50)
+                ];
+            }, $consoleLogs)
+        ]);
         
         // Combiner les logs stockés avec les erreurs de console
         $allLogs = array_merge($storedLogs, $consoleLogs);
@@ -331,11 +350,17 @@ class LuaErrorLogger extends Page
             return strtotime($timestampB) - strtotime($timestampA);
         });
         
-        \Log::debug('Livewire: getLogs computed property completed', [
+        \Log::info('Livewire: getLogs final result', [
             'server_id' => $this->getServer()->id,
-            'stored_logs_count' => count($storedLogs),
-            'console_logs_count' => count($consoleLogs),
-            'grouped_logs_count' => count($sortedLogs)
+            'grouped_logs_count' => count($groupedLogs),
+            'sorted_logs_count' => count($sortedLogs),
+            'final_logs_details' => array_map(function($log) {
+                return [
+                    'id' => $log['id'] ?? 'unknown',
+                    'status' => $log['status'] ?? 'unknown',
+                    'message' => substr($log['message'] ?? 'unknown', 0, 50)
+                ];
+            }, $sortedLogs)
         ]);
         
         return $sortedLogs;
