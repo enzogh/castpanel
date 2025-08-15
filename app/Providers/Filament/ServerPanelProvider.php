@@ -10,6 +10,7 @@ use App\Models\Server;
 use Filament\Facades\Filament;
 use Filament\Navigation\MenuItem;
 use Filament\Navigation\NavigationItem;
+use Filament\Navigation\NavigationGroup;
 use Filament\Panel;
 
 class ServerPanelProvider extends PanelProvider
@@ -43,6 +44,17 @@ class ServerPanelProvider extends PanelProvider
                     ->visible(fn () => auth()->user()->canAccessPanel(Filament::getPanel('admin')) && auth()->user()->can('view server', Filament::getTenant()))
                     ->icon('tabler-arrow-back')
                     ->sort(99),
+            ])
+            ->navigationGroups([
+                NavigationGroup::make('Gestion du serveur')
+                    ->icon('tabler-server')
+                    ->collapsible(false),
+                NavigationGroup::make('Outils et surveillance')
+                    ->icon('tabler-tools')
+                    ->collapsible(false),
+                NavigationGroup::make('Configuration')
+                    ->icon('tabler-settings')
+                    ->collapsible(false),
             ])
             ->discoverResources(in: app_path('Filament/Server/Resources'), for: 'App\\Filament\\Server\\Resources')
             ->discoverPages(in: app_path('Filament/Server/Pages'), for: 'App\\Filament\\Server\\Pages')

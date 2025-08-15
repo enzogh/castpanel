@@ -25,6 +25,11 @@ class FileResource extends Resource
 
     protected static ?string $navigationIcon = 'tabler-files';
 
+    public static function getNavigationGroup(): ?string
+    {
+        return 'Gestion du serveur';
+    }
+
     public static function canViewAny(): bool
     {
         return auth()->user()->can(Permission::ACTION_FILE_READ, Filament::getTenant());

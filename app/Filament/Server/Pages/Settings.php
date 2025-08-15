@@ -24,7 +24,14 @@ class Settings extends ServerFormPage
 {
     protected static ?string $navigationIcon = 'tabler-settings';
 
-    protected static ?int $navigationSort = 10;
+    protected static ?int $navigationSort = 20;
+
+    protected static string $view = 'filament.server.pages.settings';
+
+    public static function getNavigationGroup(): ?string
+    {
+        return 'Configuration';
+    }
 
     public function form(Form $form): Form
     {

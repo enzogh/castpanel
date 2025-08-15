@@ -43,11 +43,16 @@ class UserResource extends Resource
 
     protected static ?string $model = User::class;
 
-    protected static ?int $navigationSort = 5;
+    protected static ?int $navigationSort = 6;
 
     protected static ?string $navigationIcon = 'tabler-users';
 
     protected static ?string $tenantOwnershipRelationshipName = 'subServers';
+
+    public static function getNavigationGroup(): ?string
+    {
+        return 'Configuration';
+    }
 
     protected static function getBadgeCount(): int
     {

@@ -54,9 +54,14 @@ class BackupResource extends Resource
 
     protected static ?int $navigationSort = 3;
 
-    protected static ?string $navigationIcon = 'tabler-file-zip';
+    protected static ?string $navigationIcon = 'tabler-database-backup';
 
     protected static bool $canCreateAnother = false;
+
+    public static function getNavigationGroup(): ?string
+    {
+        return 'Gestion du serveur';
+    }
 
     protected static function getBadgeCount(): int
     {

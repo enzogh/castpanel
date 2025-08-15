@@ -15,13 +15,18 @@ use Livewire\Attributes\Computed;
 
 class LuaErrorLogger extends Page
 {
-    protected static ?string $navigationIcon = 'tabler-file-text';
+    protected static ?string $navigationIcon = 'tabler-bug';
 
     protected static ?int $navigationSort = 10;
 
     protected static string $view = 'filament.server.pages.lua-error-logger';
 
     protected static ?string $pollingInterval = '5s';
+
+    public static function getNavigationGroup(): ?string
+    {
+        return 'Outils et surveillance';
+    }
 
     // Méthode appelée automatiquement par Livewire pour le polling
     public function updated($property): void

@@ -42,6 +42,11 @@ class ActivityResource extends Resource
 
     protected static ?string $navigationIcon = 'tabler-stack';
 
+    public static function getNavigationGroup(): ?string
+    {
+        return 'Outils et surveillance';
+    }
+
     public static function defaultTable(Table $table): Table
     {
         /** @var Server $server */

@@ -24,9 +24,16 @@ use Illuminate\Support\Facades\Validator;
 
 class Startup extends ServerFormPage
 {
-    protected static ?string $navigationIcon = 'tabler-player-play';
+    protected static ?string $navigationIcon = 'tabler-rocket';
 
-    protected static ?int $navigationSort = 9;
+    protected static ?int $navigationSort = 21;
+
+    protected static string $view = 'filament.server.pages.startup';
+
+    public static function getNavigationGroup(): ?string
+    {
+        return 'Configuration';
+    }
 
     public function form(Form $form): Form
     {

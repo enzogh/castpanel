@@ -37,6 +37,11 @@ class Console extends Page
 
     protected static string $view = 'filament.server.pages.console';
 
+    public static function getNavigationGroup(): ?string
+    {
+        return 'Gestion du serveur';
+    }
+
     public ContainerStatus $status = ContainerStatus::Offline;
 
     protected FeatureService $featureService;

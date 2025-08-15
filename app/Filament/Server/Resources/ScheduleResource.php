@@ -52,9 +52,14 @@ class ScheduleResource extends Resource
 
     protected static ?string $model = Schedule::class;
 
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 5;
 
     protected static ?string $navigationIcon = 'tabler-clock';
+
+    public static function getNavigationGroup(): ?string
+    {
+        return 'Outils et surveillance';
+    }
 
     public static function canViewAny(): bool
     {

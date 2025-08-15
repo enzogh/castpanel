@@ -34,6 +34,11 @@ class AllocationResource extends Resource
 
     protected static ?string $navigationIcon = 'tabler-network';
 
+    public static function getNavigationGroup(): ?string
+    {
+        return 'Configuration';
+    }
+
     public static function defaultTable(Table $table): Table
     {
         /** @var Server $server */
