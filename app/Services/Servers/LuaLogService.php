@@ -646,6 +646,19 @@ class LuaLogService
     }
 
     /**
+     * Écrit un fichier de log complet (remplace le contenu existant)
+     */
+    private function writeLogFile(string $logPath, array $logs): void
+    {
+        $content = '';
+        foreach ($logs as $log) {
+            $content .= json_encode($log) . "\n";
+        }
+        
+        Storage::disk('local')->put($logPath, $content);
+    }
+
+    /**
      * Applique les filtres aux logs
      */
     private function applyFilters(array $logs, array $filters): array
@@ -798,18 +811,18 @@ class LuaLogService
     public function markLogAsResolved(Server $server, string $errorKey): bool
     {
         try {
-            $logFile = $this->getLogFilePath($server);
+            $logPath = $this->getLogPath($server);
             
-            if (!file_exists($logFile)) {
+            if (!Storage::disk('local')->exists($logPath)) {
                 Log::channel('lua')->warning('Log file not found for marking as resolved', [
                     'server_id' => $server->id,
                     'error_key' => $errorKey,
-                    'log_file' => $logFile
+                    'log_path' => $logPath
                 ]);
                 return false;
             }
 
-            $logs = $this->readLogs($logFile);
+            $logs = $this->parseLogFile($logPath);
             $updated = false;
 
             foreach ($logs as &$log) {
@@ -822,7 +835,8 @@ class LuaLogService
             }
 
             if ($updated) {
-                $this->writeLogs($logFile, $logs);
+                // Réécrire le fichier complet avec les modifications
+                $this->writeLogFile($logPath, $logs);
                 Log::channel('lua')->info('Log marked as resolved', [
                     'server_id' => $server->id,
                     'error_key' => $errorKey
@@ -852,18 +866,18 @@ class LuaLogService
     public function markLogAsUnresolved(Server $server, string $errorKey): bool
     {
         try {
-            $logFile = $this->getLogFilePath($server);
+            $logPath = $this->getLogPath($server);
             
-            if (!file_exists($logFile)) {
+            if (!Storage::disk('local')->exists($logPath)) {
                 Log::channel('lua')->warning('Log file not found for marking as unresolved', [
                     'server_id' => $server->id,
                     'error_key' => $errorKey,
-                    'log_file' => $logFile
+                    'log_path' => $logPath
                 ]);
                 return false;
             }
 
-            $logs = $this->readLogs($logFile);
+            $logs = $this->parseLogFile($logPath);
             $updated = false;
 
             foreach ($logs as &$log) {
@@ -876,7 +890,8 @@ class LuaLogService
             }
 
             if ($updated) {
-                $this->writeLogs($logFile, $logs);
+                // Réécrire le fichier complet avec les modifications
+                $this->writeLogFile($logPath, $logs);
                 Log::channel('lua')->info('Log marked as unresolved', [
                     'server_id' => $server->id,
                     'error_key' => $errorKey
@@ -906,18 +921,18 @@ class LuaLogService
     public function deleteLog(Server $server, string $errorKey): bool
     {
         try {
-            $logFile = $this->getLogFilePath($server);
+            $logPath = $this->getLogPath($server);
             
-            if (!file_exists($logFile)) {
+            if (!Storage::disk('local')->exists($logPath)) {
                 Log::channel('lua')->warning('Log file not found for deletion', [
                     'server_id' => $server->id,
                     'error_key' => $errorKey,
-                    'log_file' => $logFile
+                    'log_path' => $logPath
                 ]);
                 return false;
             }
 
-            $logs = $this->readLogs($logFile);
+            $logs = $this->parseLogFile($logPath);
             $originalCount = count($logs);
             $filteredLogs = [];
 
@@ -929,7 +944,8 @@ class LuaLogService
             }
 
             if (count($filteredLogs) < $originalCount) {
-                $this->writeLogs($logFile, $filteredLogs);
+                // Réécrire le fichier complet avec les modifications
+                $this->writeLogFile($logPath, $filteredLogs);
                 Log::channel('lua')->info('Log deleted', [
                     'server_id' => $server->id,
                     'error_key' => $errorKey,
@@ -947,8 +963,7 @@ class LuaLogService
         } catch (\Exception $e) {
             Log::channel('lua')->error('Error deleting log', [
                 'server_id' => $server->id,
-                'error_key' => $errorKey,
-                'error' => $e->getMessage()
+                'error_key' => $errorKey
             ]);
             return false;
         }
