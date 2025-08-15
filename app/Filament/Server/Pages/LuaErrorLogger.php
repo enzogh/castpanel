@@ -478,7 +478,7 @@ class LuaErrorLogger extends Page
                     try {
                         $existingError = \App\Models\LuaError::where('error_key', $errorKey)
                             ->where('server_id', $this->getServer()->id)
-                            ->whereNull('deleted_at') // Seulement les erreurs visibles
+                            ->whereNull('closed_at') // Seulement les erreurs non fermées
                             ->first();
                         
                         if ($existingError) {
@@ -745,24 +745,24 @@ class LuaErrorLogger extends Page
             ]);
         }
         
-        // 2. Masquer dans la base de données (suppression soft)
+        // 2. Fermer dans la base de données (suppression soft)
         try {
             $success = $this->getLuaLogService()->deleteLog($this->getServer(), $errorKey);
             $deletedFromStored = $success;
             
             if ($success) {
-                \Log::info('Livewire: Error soft deleted from database', [
+                \Log::info('Livewire: Error closed in database', [
                     'server_id' => $this->getServer()->id,
                     'error_key' => $errorKey
                 ]);
             } else {
-                \Log::warning('Livewire: Failed to soft delete error from database', [
+                \Log::warning('Livewire: Failed to close error in database', [
                     'server_id' => $this->getServer()->id,
                     'error_key' => $errorKey
                 ]);
             }
         } catch (\Exception $e) {
-            \Log::error('Livewire: Exception while soft deleting from database', [
+            \Log::error('Livewire: Exception while closing error in database', [
                 'server_id' => $this->getServer()->id,
                 'error_key' => $errorKey,
                 'error' => $e->getMessage()

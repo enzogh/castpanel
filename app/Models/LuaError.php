@@ -90,7 +90,7 @@ class LuaError extends Model
      */
     public function scopeVisible($query)
     {
-        return $query->whereNull('deleted_at');
+        return $query->whereNull('closed_at');
     }
 
     /**
@@ -98,7 +98,7 @@ class LuaError extends Model
      */
     public function scopeDeleted($query)
     {
-        return $query->whereNotNull('deleted_at');
+        return $query->whereNotNull('closed_at');
     }
 
     /**
@@ -166,7 +166,8 @@ class LuaError extends Model
     public function softDelete(): void
     {
         $this->update([
-            'deleted_at' => now(),
+            'closed_at' => now(),
+            'status' => self::STATUS_CLOSED,
         ]);
     }
 
@@ -176,7 +177,8 @@ class LuaError extends Model
     public function restore(): void
     {
         $this->update([
-            'deleted_at' => null,
+            'closed_at' => null,
+            'status' => self::STATUS_OPEN,
         ]);
     }
 

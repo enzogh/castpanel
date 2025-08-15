@@ -414,7 +414,7 @@ class LuaLogService
         }
 
         try {
-            // Récupérer seulement les erreurs visibles (non supprimées)
+            // Récupérer seulement les erreurs non fermées (visibles)
             $query = LuaError::forServer($server->id)->visible();
 
             // Appliquer les filtres
@@ -504,10 +504,10 @@ class LuaLogService
             // Créer un hash unique pour cette erreur
             $errorKey = md5($message . '|' . ($addon ?? 'unknown'));
 
-            // Vérifier si l'erreur existe déjà et n'est pas supprimée
+            // Vérifier si l'erreur existe déjà et n'est pas fermée
             $existingError = LuaError::where('error_key', $errorKey)
                 ->where('server_id', $server->id)
-                ->whereNull('deleted_at')
+                ->whereNull('closed_at') // Seulement les erreurs non fermées
                 ->first();
 
             if ($existingError) {
@@ -1043,37 +1043,37 @@ class LuaLogService
     }
 
     /**
-     * Masque un log (suppression soft) au lieu de le supprimer physiquement
+     * Ferme un log (suppression soft) au lieu de le supprimer physiquement
      */
     public function deleteLog(Server $server, string $errorKey): bool
     {
         try {
             $luaError = LuaError::where('error_key', $errorKey)
                 ->where('server_id', $server->id)
-                ->whereNull('deleted_at') // Seulement les erreurs non supprimées
+                ->whereNull('closed_at') // Seulement les erreurs non fermées
                 ->first();
 
             if (!$luaError) {
-                Log::channel('lua')->warning('Log not found for soft deletion', [
+                Log::channel('lua')->warning('Log not found for closing', [
                     'server_id' => $server->id,
                     'error_key' => $errorKey
                 ]);
                 return false;
             }
 
-            // Masquer l'erreur au lieu de la supprimer
+            // Fermer l'erreur au lieu de la supprimer
             $luaError->softDelete();
 
-            Log::channel('lua')->info('Log soft deleted (hidden from view)', [
+            Log::channel('lua')->info('Log closed (hidden from view)', [
                 'server_id' => $server->id,
                 'error_key' => $errorKey,
                 'message' => $luaError->message,
-                'deleted_at' => $luaError->deleted_at
+                'closed_at' => $luaError->closed_at
             ]);
             return true;
 
         } catch (\Exception $e) {
-            Log::channel('lua')->error('Error soft deleting log', [
+            Log::channel('lua')->error('Error closing log', [
                 'server_id' => $server->id,
                 'error_key' => $errorKey,
                 'error' => $e->getMessage()
