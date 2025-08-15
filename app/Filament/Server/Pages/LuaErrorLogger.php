@@ -50,12 +50,36 @@ class LuaErrorLogger extends Page
         ]);
         
         $this->luaLogService = app(LuaLogService::class);
+        
+        // Démarrer immédiatement la surveillance
+        $this->startMonitoring();
+    }
+
+    public function startMonitoring(): void
+    {
+        \Log::channel('lua')->info('Livewire: Starting initial monitoring', [
+            'server_id' => $this->getServer()->id
+        ]);
+        
+        // Première surveillance immédiate
+        $this->monitorConsole();
+        
+        // Programmer la surveillance toutes les 5 secondes
+        $this->dispatch('start-polling');
     }
 
     protected function getLuaLogService(): LuaLogService
     {
+        \Log::channel('lua')->debug('Livewire: getLuaLogService called', [
+            'server_id' => $this->getServer()->id,
+            'service_exists' => $this->luaLogService ? 'yes' : 'no'
+        ]);
+        
         if (!$this->luaLogService) {
             $this->luaLogService = app(LuaLogService::class);
+            \Log::channel('lua')->debug('Livewire: LuaLogService created', [
+                'server_id' => $this->getServer()->id
+            ]);
         }
         return $this->luaLogService;
     }
@@ -174,6 +198,12 @@ class LuaErrorLogger extends Page
 
     public function monitorConsole(): void
     {
+        \Log::channel('lua')->info('Livewire: monitorConsole called', [
+            'server_id' => $this->getServer()->id,
+            'logs_paused' => $this->logsPaused,
+            'timestamp' => now()->toISOString()
+        ]);
+        
         if (!$this->logsPaused) {
             \Log::channel('lua')->info('Livewire: Starting console monitoring', [
                 'server_id' => $this->getServer()->id,
