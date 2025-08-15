@@ -30,11 +30,19 @@ class LuaErrorLogger extends Page
     public $autoScroll = true;
     public $consoleErrors = [];
 
-    protected LuaLogService $luaLogService;
+    protected ?LuaLogService $luaLogService = null;
 
     public function mount(): void
     {
         $this->luaLogService = app(LuaLogService::class);
+    }
+
+    protected function getLuaLogService(): LuaLogService
+    {
+        if (!$this->luaLogService) {
+            $this->luaLogService = app(LuaLogService::class);
+        }
+        return $this->luaLogService;
     }
 
     public static function canAccess(): bool
@@ -81,7 +89,7 @@ class LuaErrorLogger extends Page
             'time' => $this->timeFilter,
         ];
 
-        $storedLogs = $this->luaLogService->getLogs($this->getServer(), $filters);
+        $storedLogs = $this->getLuaLogService()->getLogs($this->getServer(), $filters);
         
         // Combiner avec les erreurs de console en temps réel
         $allLogs = array_merge($storedLogs, $this->consoleErrors);
@@ -97,19 +105,19 @@ class LuaErrorLogger extends Page
     #[Computed]
     public function getStats(): array
     {
-        return $this->luaLogService->getLogStats($this->getServer());
+        return $this->getLuaLogService()->getLogStats($this->getServer());
     }
 
     #[Computed]
     public function getTopAddonErrors(): array
     {
-        return $this->luaLogService->getTopAddonErrors($this->getServer(), 10);
+        return $this->getLuaLogService()->getTopAddonErrors($this->getServer(), 10);
     }
 
     #[Computed]
     public function getTopErrorTypes(): array
     {
-        return $this->luaLogService->getTopErrorTypes($this->getServer(), 10);
+        return $this->getLuaLogService()->getTopErrorTypes($this->getServer(), 10);
     }
 
     public function refreshLogs(): void
@@ -122,7 +130,7 @@ class LuaErrorLogger extends Page
     public function monitorConsole(): void
     {
         if (!$this->logsPaused) {
-            $newErrors = $this->luaLogService->monitorConsole($this->getServer());
+            $newErrors = $this->getLuaLogService()->monitorConsole($this->getServer());
             
             foreach ($newErrors as $error) {
                 // Vérifier si l'erreur n'existe pas déjà
@@ -139,7 +147,7 @@ class LuaErrorLogger extends Page
                     $this->consoleErrors[] = $error;
                     
                     // Sauvegarder l'erreur dans le fichier de log
-                    $this->luaLogService->addLog(
+                    $this->getLuaLogService()->addLog(
                         $this->getServer(),
                         $error['level'],
                         $error['message'],
@@ -158,7 +166,7 @@ class LuaErrorLogger extends Page
 
     public function clearLogs(): void
     {
-        $success = $this->luaLogService->clearLogs($this->getServer());
+        $success = $this->getLuaLogService()->clearLogs($this->getServer());
         
         if ($success) {
             $this->dispatch('logs-cleared');
@@ -167,7 +175,7 @@ class LuaErrorLogger extends Page
 
     public function exportLogs(string $format = 'json'): void
     {
-        $exportData = $this->luaLogService->exportLogs($this->getServer(), $format);
+        $exportData = $this->getLuaLogService()->exportLogs($this->getServer(), $format);
         
         if (!empty($exportData)) {
             $filename = "lua_logs_server_{$this->getServer()->id}_" . now()->format('Y-m-d_H-i-s') . ".{$format}";
