@@ -32,8 +32,15 @@ class LuaErrorLogger extends Page
             'server_id' => $this->getServer()->id
         ]);
         
-        // Démarrer la surveillance automatique de la console
-        $this->startConsoleMonitoring();
+        // Démarrer la surveillance automatique de la console de manière sécurisée
+        try {
+            $this->startConsoleMonitoring();
+        } catch (\Exception $e) {
+            Log::error('Livewire: Failed to start console monitoring during mount', [
+                'server_id' => $this->getServer()->id,
+                'error' => $e->getMessage()
+            ]);
+        }
     }
 
     public function getTitle(): string

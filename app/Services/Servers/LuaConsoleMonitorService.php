@@ -40,9 +40,13 @@ class LuaConsoleMonitorService
             // Enregistrer les nouvelles erreurs en base
             $newErrors = $this->saveNewErrors($server, $errors);
             
+            // Sécuriser le comptage des lignes
+            $lines = explode("\n", $consoleOutput);
+            $lineCount = is_array($lines) ? count($lines) : 0;
+            
             Log::info('LuaConsoleMonitor: Console monitoring completed', [
                 'server_id' => $server->id,
-                'console_lines' => count(explode("\n", $consoleOutput)),
+                'console_lines' => $lineCount,
                 'errors_found' => count($errors),
                 'new_errors_saved' => count($newErrors)
             ]);
@@ -118,23 +122,34 @@ class LuaConsoleMonitorService
      */
     private function parseConsoleForLuaErrors(string $consoleOutput): array
     {
-        if (empty($consoleOutput)) {
+        if (empty($consoleOutput) || !is_string($consoleOutput)) {
+            Log::warning('LuaConsoleMonitor: Invalid console output', [
+                'console_output_type' => gettype($consoleOutput),
+                'console_output_length' => is_string($consoleOutput) ? strlen($consoleOutput) : 'N/A'
+            ]);
             return [];
         }
         
         $errors = [];
         $lines = explode("\n", $consoleOutput);
         
+        // S'assurer que explode() a retourné un tableau
         if (!is_array($lines)) {
-            Log::warning('LuaConsoleMonitor: Failed to split console output into lines', [
+            Log::warning('LuaConsoleMonitor: explode() failed to return array', [
                 'console_output_type' => gettype($consoleOutput),
-                'console_output_length' => strlen($consoleOutput)
+                'console_output_length' => strlen($consoleOutput),
+                'explode_result_type' => gettype($lines)
             ]);
             return [];
         }
         
         foreach ($lines as $lineNumber => $line) {
             if (!is_string($line)) {
+                Log::warning('LuaConsoleMonitor: Non-string line found', [
+                    'line_number' => $lineNumber,
+                    'line_type' => gettype($line),
+                    'line_value' => $line
+                ]);
                 continue;
             }
             
@@ -203,6 +218,10 @@ class LuaConsoleMonitorService
      */
     private function extractStackTrace(array $allLines, int $errorLineNumber): string
     {
+        if (!is_array($allLines) || empty($allLines)) {
+            return '';
+        }
+        
         $stackTrace = [];
         $maxLines = 10;
         
@@ -211,10 +230,12 @@ class LuaConsoleMonitorService
         $endLine = min(count($allLines) - 1, $errorLineNumber + $maxLines);
         
         for ($i = $startLine; $i <= $endLine; $i++) {
-            $line = trim($allLines[$i]);
-            if (!empty($line)) {
-                $prefix = ($i === $errorLineNumber) ? '>>> ' : '    ';
-                $stackTrace[] = $prefix . $line;
+            if (isset($allLines[$i]) && is_string($allLines[$i])) {
+                $line = trim($allLines[$i]);
+                if (!empty($line)) {
+                    $prefix = ($i === $errorLineNumber) ? '>>> ' : '    ';
+                    $stackTrace[] = $prefix . $line;
+                }
             }
         }
 
