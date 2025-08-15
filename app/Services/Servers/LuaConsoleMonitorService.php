@@ -16,6 +16,10 @@ class LuaConsoleMonitorService
     public function monitorConsole(Server $server): array
     {
         if (!$this->isGarrysModServer($server)) {
+            Log::info('LuaConsoleMonitor: Server is not Garry\'s Mod', [
+                'server_id' => $server->id,
+                'egg_name' => $server->egg->name ?? 'no egg'
+            ]);
             return [];
         }
 
@@ -24,6 +28,9 @@ class LuaConsoleMonitorService
             $consoleOutput = $this->getConsoleOutput($server);
             
             if (empty($consoleOutput)) {
+                Log::info('LuaConsoleMonitor: No console output available', [
+                    'server_id' => $server->id
+                ]);
                 return [];
             }
 
@@ -45,7 +52,8 @@ class LuaConsoleMonitorService
         } catch (\Exception $e) {
             Log::error('LuaConsoleMonitor: Failed to monitor console', [
                 'server_id' => $server->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
 
             return [];
@@ -61,17 +69,37 @@ class LuaConsoleMonitorService
             $daemonUrl = $this->getDaemonUrl($server);
             $token = $this->getDaemonToken($server);
             
+            if (empty($token)) {
+                Log::warning('LuaConsoleMonitor: No daemon token available', [
+                    'server_id' => $server->id
+                ]);
+                return '';
+            }
+            
             $response = Http::timeout(10)
                 ->withHeaders([
                     'Authorization' => 'Bearer ' . $token,
                     'Accept' => 'application/json',
                 ])
-                ->get($daemonUrl . '/api/servers/' . $server->uuid . '/logs');
+                ->get($daemonUrl . '/api/servers/' . $server->id . '/logs');
 
             if ($response->successful()) {
                 $data = $response->json();
-                return $data['data'] ?? '';
+                $consoleData = $data['data'] ?? '';
+                
+                // S'assurer que c'est une chaîne
+                if (is_array($consoleData)) {
+                    $consoleData = implode("\n", $consoleData);
+                }
+                
+                return is_string($consoleData) ? $consoleData : '';
             }
+
+            Log::warning('LuaConsoleMonitor: Daemon response not successful', [
+                'server_id' => $server->id,
+                'status' => $response->status(),
+                'body' => substr($response->body(), 0, 200)
+            ]);
 
             return '';
 
@@ -90,16 +118,32 @@ class LuaConsoleMonitorService
      */
     private function parseConsoleForLuaErrors(string $consoleOutput): array
     {
+        if (empty($consoleOutput)) {
+            return [];
+        }
+        
         $errors = [];
         $lines = explode("\n", $consoleOutput);
         
+        if (!is_array($lines)) {
+            Log::warning('LuaConsoleMonitor: Failed to split console output into lines', [
+                'console_output_type' => gettype($consoleOutput),
+                'console_output_length' => strlen($consoleOutput)
+            ]);
+            return [];
+        }
+        
         foreach ($lines as $lineNumber => $line) {
+            if (!is_string($line)) {
+                continue;
+            }
+            
             $line = trim($line);
             
             // Détecter les erreurs Lua qui commencent par [ERROR]
             if ($this->isLuaError($line)) {
                 $error = $this->extractLuaError($line, $lines, $lineNumber);
-                if ($error) {
+                if ($error && is_array($error)) {
                     $errors[] = $error;
                 }
             }

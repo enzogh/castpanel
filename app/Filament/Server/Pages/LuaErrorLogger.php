@@ -198,7 +198,7 @@ class LuaErrorLogger extends Page
             $monitorService = app(LuaConsoleMonitorService::class);
             $newErrors = $monitorService->monitorConsole($this->getServer());
             
-            if (count($newErrors) > 0) {
+            if (is_array($newErrors) && count($newErrors) > 0) {
                 Log::info('Livewire: Console monitoring started, new errors found', [
                     'server_id' => $this->getServer()->id,
                     'new_errors_count' => count($newErrors)
@@ -206,12 +206,19 @@ class LuaErrorLogger extends Page
                 
                 // Forcer le refresh de l'interface
                 $this->dispatch('$refresh');
+            } else {
+                Log::info('Livewire: Console monitoring completed, no new errors', [
+                    'server_id' => $this->getServer()->id,
+                    'new_errors_type' => gettype($newErrors),
+                    'new_errors_count' => is_array($newErrors) ? count($newErrors) : 'not array'
+                ]);
             }
             
         } catch (\Exception $e) {
             Log::error('Livewire: Failed to start console monitoring', [
                 'server_id' => $this->getServer()->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
         }
     }
