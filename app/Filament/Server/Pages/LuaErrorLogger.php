@@ -45,7 +45,7 @@ class LuaErrorLogger extends Page
     public $logsPaused = false;
     public $autoScroll = true;
     public $processingError = null; // Pour afficher un indicateur de chargement sur le bouton cliqué
-    public $consoleErrors = []; // Structure: ['error_key' => ['error' => {...}, 'count' => X, 'last_seen' => timestamp]]
+    public $consoleErrors = []; // Structure: ['error_key' => ['error' => {...}, 'count' => X, 'last_seen' => timestamp]
     public $lastConsoleCheck = null; // Timestamp de la dernière vérification de la console
     
     // Propriétés publiques pour la vue
@@ -56,6 +56,8 @@ class LuaErrorLogger extends Page
         'total' => 0
     ];
     public $logs = [];
+    
+    public $hideClosed = true; // Par défaut, masquer les erreurs fermées
 
     protected ?LuaLogService $luaLogService = null;
 
@@ -262,26 +264,33 @@ class LuaErrorLogger extends Page
         // Pas besoin de filtrer côté frontend
         
         // Filtrage de sécurité côté frontend pour masquer les erreurs fermées
-        $allLogs = array_filter($allLogs, function($log) {
-            $isClosed = ($log['status'] ?? 'open') === 'closed' && ($log['closed_at'] ?? null) !== null;
+        if ($this->hideClosed) {
+            $allLogs = array_filter($allLogs, function($log) {
+                $isClosed = ($log['status'] ?? 'open') === 'closed' && ($log['closed_at'] ?? null) !== null;
+                
+                if ($isClosed) {
+                    \Log::debug('Livewire: Filtering out closed error on frontend', [
+                        'server_id' => $this->getServer()->id,
+                        'log_id' => $log['id'] ?? 'unknown',
+                        'status' => $log['status'] ?? 'unknown',
+                        'closed_at' => $log['closed_at'] ?? 'NULL',
+                        'message' => substr($log['message'] ?? 'unknown', 0, 50)
+                    ]);
+                }
+                
+                return !$isClosed;
+            });
             
-            if ($isClosed) {
-                \Log::debug('Livewire: Filtering out closed error on frontend', [
-                    'server_id' => $this->getServer()->id,
-                    'log_id' => $log['id'] ?? 'unknown',
-                    'status' => $log['status'] ?? 'unknown',
-                    'closed_at' => $log['closed_at'] ?? 'NULL',
-                    'message' => substr($log['message'] ?? 'unknown', 0, 50)
-                ]);
-            }
-            
-            return !$isClosed;
-        });
-        
-        \Log::info('Livewire: Frontend filtering completed', [
-            'server_id' => $this->getServer()->id,
-            'logs_after_frontend_filter' => count($allLogs)
-        ]);
+            \Log::info('Livewire: Frontend filtering completed (hideClosed enabled)', [
+                'server_id' => $this->getServer()->id,
+                'logs_after_frontend_filter' => count($allLogs)
+            ]);
+        } else {
+            \Log::info('Livewire: Frontend filtering skipped (hideClosed disabled)', [
+                'server_id' => $this->getServer()->id,
+                'logs_count' => count($allLogs)
+            ]);
+        }
         
         \Log::info('Livewire: Logs prepared for display', [
             'server_id' => $this->getServer()->id,
@@ -505,6 +514,19 @@ class LuaErrorLogger extends Page
 
         // Actualiser les logs avec le nouveau filtre
         // Livewire va automatiquement appeler getLogs() grâce à #[Computed]
+    }
+    
+    public function toggleHideClosed(): void
+    {
+        $this->hideClosed = !$this->hideClosed;
+        
+        \Log::info('Livewire: toggleHideClosed called', [
+            'server_id' => $this->getServer()->id,
+            'hide_closed' => $this->hideClosed
+        ]);
+
+        // Actualiser les logs avec le nouveau filtre
+        $this->logs = $this->getLogs();
     }
 
     public function monitorConsole(): void
