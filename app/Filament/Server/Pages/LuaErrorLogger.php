@@ -23,6 +23,16 @@ class LuaErrorLogger extends Page
 
     protected static ?string $pollingInterval = '5s';
 
+    // Méthode appelée automatiquement par Livewire pour le polling
+    public function updated($property): void
+    {
+        \Log::channel('lua')->info('Livewire: Property updated', [
+            'server_id' => $this->getServer()->id,
+            'property' => $property,
+            'timestamp' => now()->toISOString()
+        ]);
+    }
+
     public $search = '';
     public $levelFilter = '';
     public $timeFilter = '24h';
@@ -34,6 +44,11 @@ class LuaErrorLogger extends Page
 
     public function mount(): void
     {
+        \Log::channel('lua')->info('Livewire: Page mounted', [
+            'server_id' => $this->getServer()->id,
+            'polling_interval' => static::$pollingInterval
+        ]);
+        
         $this->luaLogService = app(LuaLogService::class);
     }
 
@@ -77,7 +92,12 @@ class LuaErrorLogger extends Page
     #[Computed]
     public function getServer(): Server
     {
-        return Filament::getTenant();
+        $server = Filament::getTenant();
+        \Log::channel('lua')->debug('Livewire: getServer called', [
+            'server_id' => $server->id,
+            'egg_name' => $server->egg->name ?? 'no egg'
+        ]);
+        return $server;
     }
 
     #[Computed]

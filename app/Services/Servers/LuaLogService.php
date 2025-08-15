@@ -79,12 +79,13 @@ class LuaLogService
         foreach ($lines as $lineNumber => $line) {
             $line = trim($line);
             
-            // Debug: logger chaque ligne pour voir ce qui arrive
+            // Debug: logger TOUTES les lignes pour voir ce qui arrive
             if (!empty($line)) {
-                Log::channel('lua')->debug('Processing line', [
+                Log::channel('lua')->info('Processing line', [
                     'line_number' => $lineNumber + 1,
                     'line_content' => $line,
-                    'line_length' => strlen($line)
+                    'line_length' => strlen($line),
+                    'starts_with_error' => preg_match('/^\[ERROR\]/i', $line) ? 'YES' : 'NO'
                 ]);
             }
             
@@ -102,6 +103,15 @@ class LuaLogService
                         'line_number' => $lineNumber + 1,
                         'error_type' => $error['error_type'] ?? 'unknown',
                         'addon' => $error['addon'] ?? 'unknown'
+                    ]);
+                }
+            } else {
+                // Debug: logger pourquoi la ligne n'est PAS détectée comme erreur
+                if (!empty($line)) {
+                    Log::channel('lua')->info('Line NOT detected as Lua error', [
+                        'line_number' => $lineNumber + 1,
+                        'line_content' => $line,
+                        'reason' => 'isLuaError() returned false'
                     ]);
                 }
             }
