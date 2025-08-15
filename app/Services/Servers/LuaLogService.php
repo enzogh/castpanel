@@ -404,16 +404,17 @@ class LuaLogService
     }
 
     /**
-     * Récupère les logs Lua d'un serveur depuis la base de données
+     * Récupère les logs Lua d'un serveur (base de données ou fichiers selon disponibilité)
      */
     public function getLogs(Server $server, array $filters = []): array
     {
-        try {
-            // Vérifier que c'est un serveur Garry's Mod
-            if (!$this->isGarrysModServer($server)) {
-                return [];
-            }
+        // Vérifier que c'est un serveur Garry's Mod
+        if (!$this->isGarrysModServer($server)) {
+            return [];
+        }
 
+        try {
+            // Essayer d'abord la base de données
             $query = LuaError::forServer($server->id);
 
             // Appliquer les filtres
@@ -463,26 +464,43 @@ class LuaLogService
             })->toArray();
 
         } catch (\Exception $e) {
-            \Log::channel('lua')->error('Error retrieving logs from database', [
+            \Log::channel('lua')->warning('Database unavailable, falling back to file system', [
                 'server_id' => $server->id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'error' => $e->getMessage()
             ]);
             
-            return [];
+            // Fallback vers les fichiers
+            return $this->getLogsFromFiles($server, $filters);
         }
     }
 
     /**
-     * Ajoute un nouveau log en base de données
+     * Récupère les logs depuis les fichiers (fallback)
+     */
+    private function getLogsFromFiles(Server $server, array $filters = []): array
+    {
+        $logPath = $this->getLogPath($server);
+        
+        if (!Storage::disk('local')->exists($logPath)) {
+            return [];
+        }
+
+        $logs = $this->parseLogFile($logPath);
+        
+        return $this->applyFilters($logs, $filters);
+    }
+
+    /**
+     * Ajoute un nouveau log (base de données ou fichiers selon disponibilité)
      */
     public function addLog(Server $server, string $level, string $message, ?string $addon = null, ?string $stackTrace = null): void
     {
-        try {
-            if (!$this->isGarrysModServer($server)) {
-                return;
-            }
+        if (!$this->isGarrysModServer($server)) {
+            return;
+        }
 
+        try {
+            // Essayer d'abord la base de données
             $errorKey = md5($message . '|' . ($addon ?? 'unknown'));
 
             // Créer ou mettre à jour l'erreur
@@ -511,14 +529,39 @@ class LuaLogService
             ]);
 
         } catch (\Exception $e) {
-            Log::channel('lua')->error('Error adding log to database', [
+            Log::channel('lua')->warning('Database unavailable, falling back to file system', [
                 'server_id' => $server->id,
                 'message' => $message,
                 'addon' => $addon,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'error' => $e->getMessage()
             ]);
+            
+            // Fallback vers les fichiers
+            $this->addLogToFiles($server, $level, $message, $addon, $stackTrace);
         }
+    }
+
+    /**
+     * Ajoute un log aux fichiers (fallback)
+     */
+    private function addLogToFiles(Server $server, string $level, string $message, ?string $addon = null, ?string $stackTrace = null): void
+    {
+        $logEntry = [
+            'timestamp' => now()->toISOString(),
+            'level' => $level,
+            'message' => $message,
+            'addon' => $addon,
+            'stack_trace' => $stackTrace,
+            'server_id' => $server->id,
+        ];
+
+        $logPath = $this->getLogPath($server);
+        
+        // Ajouter le log au fichier
+        $this->appendToLogFile($logPath, $logEntry);
+        
+        // Logger aussi dans Laravel pour le debugging
+        Log::channel('lua')->info('Lua log added to file', $logEntry);
     }
 
     /**

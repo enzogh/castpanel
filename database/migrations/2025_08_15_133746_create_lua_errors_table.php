@@ -32,8 +32,8 @@ return new class extends Migration
             $table->index(['first_seen']);
             $table->index(['last_seen']);
             
-            // Ajouter la contrainte de clé étrangère après la création de la table
-            $table->foreign('server_id')->references('id')->on('servers')->onDelete('cascade');
+            // Pas de contrainte de clé étrangère pour éviter les problèmes de compatibilité
+            // La relation sera gérée au niveau de l'application
         });
     }
 
