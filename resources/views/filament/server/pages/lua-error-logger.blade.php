@@ -5,10 +5,9 @@
             <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700">
                 <div class="flex items-center">
                     <div class="p-2 bg-red-100 dark:bg-red-900/20 rounded-lg">
-                        <x-filament::icon
-                            name="tabler-alert-circle"
-                            class="w-6 h-6 text-red-600 dark:text-red-400"
-                        />
+                        <svg class="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                        </svg>
                     </div>
                     <div class="ml-3">
                         <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Erreurs critiques</p>
@@ -20,10 +19,9 @@
             <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700">
                 <div class="flex items-center">
                     <div class="p-2 bg-yellow-100 dark:bg-yellow-900/20 rounded-lg">
-                        <x-filament::icon
-                            name="tabler-alert-triangle"
-                            class="w-6 h-6 text-yellow-600 dark:text-yellow-400"
-                        />
+                        <svg class="w-6 h-6 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                        </svg>
                     </div>
                     <div class="ml-3">
                         <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Avertissements</p>
@@ -35,10 +33,9 @@
             <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700">
                 <div class="flex items-center">
                     <div class="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
-                        <x-filament::icon
-                            name="tabler-info-circle"
-                            class="w-6 h-6 text-blue-600 dark:text-blue-400"
-                        />
+                        <svg class="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
                     </div>
                     <div class="ml-3">
                         <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Informations</p>
@@ -50,10 +47,9 @@
             <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700">
                 <div class="flex items-center">
                     <div class="p-2 bg-green-100 dark:bg-green-900/20 rounded-lg">
-                        <x-filament::icon
-                            name="tabler-check-circle"
-                            class="w-6 h-6 text-green-600 dark:text-green-400"
-                        />
+                        <svg class="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
                     </div>
                     <div class="ml-3">
                         <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total</p>
@@ -70,35 +66,41 @@
                     <label for="search" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Rechercher dans les logs
                     </label>
-                    <x-filament::input.wrapper>
-                        <x-filament::input
-                            wire:model.live="search"
-                            placeholder="Rechercher une erreur, un addon, etc..."
-                        />
-                    </x-filament::input.wrapper>
+                    <input
+                        type="text"
+                        wire:model.live="search"
+                        placeholder="Rechercher une erreur, un addon, etc..."
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                    >
                 </div>
                 <div class="sm:w-48">
                     <label for="level-filter" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Niveau
                     </label>
-                    <x-filament::select wire:model.live="levelFilter">
+                    <select
+                        wire:model.live="levelFilter"
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                    >
                         <option value="">Tous les niveaux</option>
                         <option value="error">Erreurs</option>
                         <option value="warning">Avertissements</option>
                         <option value="info">Informations</option>
-                    </x-filament::select>
+                    </select>
                 </div>
                 <div class="sm:w-48">
                     <label for="time-filter" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Période
                     </label>
-                    <x-filament::select wire:model.live="timeFilter">
+                    <select
+                        wire:model.live="timeFilter"
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                    >
                         <option value="1h">Dernière heure</option>
                         <option value="24h">Dernières 24h</option>
                         <option value="7d">7 derniers jours</option>
                         <option value="30d">30 derniers jours</option>
                         <option value="all">Tout</option>
-                    </x-filament::select>
+                    </select>
                 </div>
             </div>
         </div>
@@ -111,22 +113,24 @@
                         Logs en temps réel
                     </h3>
                     <div class="flex items-center space-x-2">
-                        <x-filament::button
+                        <button
                             wire:click="toggleAutoScroll"
-                            :color="$autoScroll ? 'primary' : 'gray'"
-                            size="sm"
+                            class="px-3 py-1 text-sm rounded-md transition-colors {{ $autoScroll ? 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300' }}"
                         >
-                            <x-filament::icon name="tabler-arrow-down" class="w-4 h-4 mr-1" />
+                            <svg class="w-4 h-4 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+                            </svg>
                             {{ $autoScroll ? 'Auto-scroll' : 'Auto-scroll désactivé' }}
-                        </x-filament::button>
-                        <x-filament::button
+                        </button>
+                        <button
                             wire:click="togglePauseLogs"
-                            :color="$logsPaused ? 'danger' : 'gray'"
-                            size="sm"
+                            class="px-3 py-1 text-sm rounded-md transition-colors {{ $logsPaused ? 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300' }}"
                         >
-                            <x-filament::icon name="{{ $logsPaused ? 'tabler-player-play' : 'tabler-player-pause' }}" class="w-4 h-4 mr-1" />
+                            <svg class="w-4 h-4 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $logsPaused ? 'M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' : 'M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z' }}"></path>
+                            </svg>
                             {{ $logsPaused ? 'Reprendre' : 'Pause' }}
-                        </x-filament::button>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -135,7 +139,9 @@
                 <div class="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 h-96 overflow-y-auto font-mono text-sm">
                     @if(empty($this->logs))
                         <div class="text-gray-500 dark:text-gray-400 text-center py-8">
-                            <x-filament::icon name="tabler-check-circle" class="w-8 h-8 mx-auto mb-2 text-green-500" />
+                            <svg class="w-8 h-8 mx-auto mb-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
                             <p>Aucun log disponible pour le moment</p>
                             <p class="text-sm mt-1">Les logs apparaîtront ici en temps réel</p>
                         </div>
