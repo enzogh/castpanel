@@ -63,24 +63,7 @@
                 <div class="overflow-x-auto">
 
                     
-                                <!-- Bouton de test pour créer une erreur -->
-            <div class="mb-4 flex justify-center">
-                <button
-                    wire:click="createTestError"
-                    wire:loading.attr="disabled"
-                    wire:loading.class="opacity-50 cursor-not-allowed"
-                    class="inline-flex items-center px-4 py-2 rounded-md text-sm font-medium bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Créer une erreur de test pour vérifier le tableau"
-                >
-                    <svg wire:loading.remove class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                    </svg>
-                    <svg wire:loading class="w-4 h-4 mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                    </svg>
-                    Créer une erreur de test
-                </button>
-            </div>
+                    
             
             <!-- Tableau toujours visible -->
             <table class="w-full divide-y divide-gray-200 dark:divide-gray-700">

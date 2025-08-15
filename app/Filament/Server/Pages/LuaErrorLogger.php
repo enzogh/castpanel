@@ -281,7 +281,20 @@ class LuaErrorLogger extends Page
         
         // Filtrer strictement les erreurs avec status = 'open' et closed_at = null
         $openLogs = array_filter($allLogs, function($log) {
-            return ($log['status'] ?? 'open') === 'open' && ($log['closed_at'] ?? null) === null;
+            $isOpen = ($log['status'] ?? 'open') === 'open' && ($log['closed_at'] ?? null) === null;
+            
+            // Log détaillé pour debug
+            if (!$isOpen) {
+                \Log::debug('Livewire: Filtering out non-open error', [
+                    'server_id' => $this->getServer()->id,
+                    'message' => substr($log['message'] ?? 'unknown', 0, 50),
+                    'status' => $log['status'] ?? 'unknown',
+                    'closed_at' => $log['closed_at'] ?? 'NULL',
+                    'reason' => 'Status not open or closed_at not null'
+                ]);
+            }
+            
+            return $isOpen;
         });
         
         \Log::info('Livewire: Logs filtered for open status only', [
@@ -295,6 +308,19 @@ class LuaErrorLogger extends Page
         
         // Utiliser uniquement les erreurs ouvertes
         $allLogs = $openLogs;
+        
+        // Nettoyer aussi les erreurs en mémoire qui ne devraient pas être visibles
+        foreach ($this->consoleErrors as $errorKey => $errorData) {
+            if (($errorData['status'] ?? 'open') !== 'open' || ($errorData['closed_at'] ?? null) !== null) {
+                \Log::info('Livewire: Cleaning up non-open console error from memory', [
+                    'server_id' => $this->getServer()->id,
+                    'error_key' => $errorKey,
+                    'status' => $errorData['status'] ?? 'unknown',
+                    'closed_at' => $errorData['closed_at'] ?? 'NULL'
+                ]);
+                unset($this->consoleErrors[$errorKey]);
+            }
+        }
         
         // Regrouper les erreurs identiques par message et addon pour éviter les doublons
         $groupedLogs = [];
