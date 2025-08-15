@@ -842,6 +842,38 @@ class LuaErrorLogger extends Page
             ]);
         }
     }
+
+    public function createTestError(): void
+    {
+        \Log::info('Livewire: Creating test error', [
+            'server_id' => $this->getServer()->id
+        ]);
+        
+        $errorKey = md5('[ERROR] Test: attempt to call global \'test_function\' (a nil value)' . 'Test Addon');
+        
+        $this->consoleErrors[$errorKey] = [
+            'error' => [
+                'message' => '[ERROR] Test: attempt to call global \'test_function\' (a nil value)',
+                'addon' => 'Test Addon',
+                'stack_trace' => 'Test stack trace line 1\nTest stack trace line 2',
+                'timestamp' => now()->toISOString()
+            ],
+            'count' => 1,
+            'first_seen' => now()->toISOString(),
+            'last_seen' => now()->toISOString(),
+            'resolved' => false,
+            'status' => 'open',
+            'closed_at' => null
+        ];
+        
+        \Log::info('Livewire: Test error created', [
+            'server_id' => $this->getServer()->id,
+            'error_key' => $errorKey,
+            'console_errors_count' => count($this->consoleErrors)
+        ]);
+        
+        $this->refreshLogs();
+    }
     
     /**
      * Nettoie les erreurs résolues anciennes pour éviter l'accumulation
