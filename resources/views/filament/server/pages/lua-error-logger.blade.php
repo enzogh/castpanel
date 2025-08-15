@@ -1,5 +1,16 @@
 <x-filament-panels::page class="fi-lua-error-logger-page">
     <div class="space-y-6">
+        <!-- Message d'erreur de base de données -->
+        <div id="database-error-message" class="hidden bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-4 mb-4">
+            <div class="flex items-center">
+                <svg class="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                </svg>
+                <span class="text-red-800 dark:text-red-200 font-medium">Erreur de connexion à la base de données</span>
+            </div>
+            <p class="text-red-700 dark:text-red-300 text-sm mt-1">Les données peuvent ne pas être à jour. Vérifiez la connectivité du serveur.</p>
+        </div>
+
         <!-- Statistiques des erreurs -->
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
             <!-- En-tête des statistiques -->
@@ -19,6 +30,8 @@
                     <div class="flex items-center space-x-2">
                         <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                         <span class="text-sm text-green-600 dark:text-green-400 font-medium">En direct</span>
+                        <div class="w-2 h-2 bg-blue-500 rounded-full"></div>
+                        <span class="text-sm text-blue-600 dark:text-blue-400 font-medium">Base OK</span>
                     </div>
                 </div>
             </div>
@@ -417,6 +430,15 @@
             // Forcer le refresh de Livewire
             if (window.Livewire) {
                 window.Livewire.dispatch('refresh');
+            }
+        });
+
+        // Écouter les erreurs de base de données
+        document.addEventListener('database-error', function(event) {
+            console.log('Database error:', event.detail);
+            const errorMessage = document.getElementById('database-error-message');
+            if (errorMessage) {
+                errorMessage.classList.remove('hidden');
             }
         });
     </script>

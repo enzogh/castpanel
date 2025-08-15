@@ -64,9 +64,15 @@ class LuaErrorLogger extends Page
         $this->luaLogService = app(LuaLogService::class);
         
         // Tester la connexion à la base de données
-        if (!$this->testDatabaseConnection()) {
+        $dbConnected = $this->testDatabaseConnection();
+        if (!$dbConnected) {
             \Log::error('Livewire: Database connection failed during mount', [
                 'server_id' => $this->getServer()->id
+            ]);
+            
+            // Afficher un message d'erreur dans l'interface
+            $this->dispatch('database-error', [
+                'message' => 'Connexion à la base de données échouée. Vérifiez la connectivité du serveur.'
             ]);
         }
         
@@ -75,23 +81,25 @@ class LuaErrorLogger extends Page
         
         // Initialiser les propriétés publiques avec des valeurs par défaut
         try {
-            $this->stats = $this->getStats();
+            if ($dbConnected) {
+                $this->stats = $this->getStats();
+                $this->logs = $this->getLogs();
+            } else {
+                // Utiliser des valeurs par défaut si la DB n'est pas accessible
+                $this->stats = ['critical_errors' => 0, 'warnings' => 0, 'info' => 0, 'total' => 0, 'resolved' => 0];
+                $this->logs = [];
+            }
         } catch (\Exception $e) {
-            \Log::error('Error getting stats', ['error' => $e->getMessage()]);
+            \Log::error('Error getting data', ['error' => $e->getMessage()]);
             $this->stats = ['critical_errors' => 0, 'warnings' => 0, 'info' => 0, 'total' => 0, 'resolved' => 0];
-        }
-        
-        try {
-            $this->logs = $this->getLogs();
-        } catch (\Exception $e) {
-            \Log::error('Error getting logs', ['error' => $e->getMessage()]);
             $this->logs = [];
         }
         
         \Log::info('Livewire: Page mount completed', [
             'server_id' => $this->getServer()->id,
             'console_errors_count' => count($this->consoleErrors),
-            'stats' => $this->stats
+            'stats' => $this->stats,
+            'db_connected' => $dbConnected
         ]);
     }
 
