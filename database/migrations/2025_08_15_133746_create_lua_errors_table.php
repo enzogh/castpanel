@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('lua_errors', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('server_id')->constrained('servers')->onDelete('cascade');
+            $table->unsignedBigInteger('server_id');
             $table->string('error_key', 32)->unique(); // MD5 hash unique
             $table->string('level')->default('ERROR');
             $table->text('message');
@@ -31,6 +31,9 @@ return new class extends Migration
             $table->index(['error_key']);
             $table->index(['first_seen']);
             $table->index(['last_seen']);
+            
+            // Ajouter la contrainte de clé étrangère après la création de la table
+            $table->foreign('server_id')->references('id')->on('servers')->onDelete('cascade');
         });
     }
 
