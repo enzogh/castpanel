@@ -297,7 +297,19 @@ class LuaErrorLogger extends Page
     {
         try {
             $result = $this->getLuaLogService()->getTopAddonErrors($this->getServer(), 10);
-            return is_array($result) ? $result : [];
+            if (!is_array($result)) {
+                return [];
+            }
+            
+            // Transformer le format ['addon_name' => count] en [['addon' => 'name', 'count' => X]]
+            $transformed = [];
+            foreach ($result as $addon => $count) {
+                $transformed[] = [
+                    'addon' => $addon,
+                    'count' => $count
+                ];
+            }
+            return $transformed;
         } catch (\Exception $e) {
             \Log::error('Livewire: Error in getTopAddonErrors', ['error' => $e->getMessage()]);
             return [];
@@ -308,7 +320,19 @@ class LuaErrorLogger extends Page
     {
         try {
             $result = $this->getLuaLogService()->getTopErrorTypes($this->getServer(), 10);
-            return is_array($result) ? $result : [];
+            if (!is_array($result)) {
+                return [];
+            }
+            
+            // Transformer le format ['error_type' => count] en [['type' => 'error_type', 'count' => X]]
+            $transformed = [];
+            foreach ($result as $type => $count) {
+                $transformed[] = [
+                    'type' => $type,
+                    'count' => $count
+                ];
+            }
+            return $transformed;
         } catch (\Exception $e) {
             \Log::error('Livewire: Error in getTopErrorTypes', ['error' => $e->getMessage()]);
             return [];
