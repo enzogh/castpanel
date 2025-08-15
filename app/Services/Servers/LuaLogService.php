@@ -129,6 +129,44 @@ class LuaLogService
     }
 
     /**
+     * Marque une erreur comme non résolue
+     */
+    public function markAsUnresolved(string $errorKey, int $serverId): bool
+    {
+        try {
+            $error = LuaError::where('error_key', $errorKey)
+                ->where('server_id', $serverId)
+                ->first();
+
+            if ($error) {
+                $error->update([
+                    'status' => 'open',
+                    'resolved' => false,
+                    'resolved_at' => null
+                ]);
+
+                Log::info('LuaLogService: Error marked as unresolved', [
+                    'server_id' => $serverId,
+                    'error_key' => $errorKey
+                ]);
+
+                return true;
+            }
+
+            return false;
+
+        } catch (\Exception $e) {
+            Log::error('LuaLogService: Failed to mark error as unresolved', [
+                'server_id' => $serverId,
+                'error_key' => $errorKey,
+                'error' => $e->getMessage()
+            ]);
+
+            return false;
+        }
+    }
+
+    /**
      * Supprime (ferme) une erreur
      */
     public function deleteLog(string $errorKey, int $serverId): bool

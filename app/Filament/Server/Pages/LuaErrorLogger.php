@@ -92,7 +92,13 @@ class LuaErrorLogger extends Page
 
             Log::info('Livewire: Logs retrieved successfully', [
                 'server_id' => $this->getServer()->id,
-                'logs_count' => count($logs)
+                'logs_count' => count($logs),
+                'show_resolved' => $this->showResolved,
+                'filters' => [
+                    'search' => $this->search,
+                    'level' => $this->levelFilter,
+                    'time' => $this->timeFilter
+                ]
             ]);
 
             return $logs;
@@ -236,6 +242,47 @@ class LuaErrorLogger extends Page
     public function monitorConsole(): void
     {
         $this->startConsoleMonitoring();
+    }
+
+    /**
+     * Bascule l'affichage des erreurs résolues
+     */
+    public function toggleShowResolved(): void
+    {
+        $this->showResolved = !$this->showResolved;
+        
+        Log::info('Livewire: Toggle show resolved', [
+            'server_id' => $this->getServer()->id,
+            'show_resolved' => $this->showResolved
+        ]);
+        
+        // Forcer le refresh de l'interface
+        $this->dispatch('$refresh');
+    }
+
+    /**
+     * Marque une erreur comme non résolue
+     */
+    public function markAsUnresolved(string $errorKey): void
+    {
+        try {
+            $service = app(LuaLogService::class);
+            $service->markAsUnresolved($errorKey, $this->getServer()->id);
+            
+            Log::info('Livewire: Error marked as unresolved', [
+                'server_id' => $this->getServer()->id,
+                'error_key' => $errorKey
+            ]);
+
+            $this->dispatch('$refresh');
+
+        } catch (\Exception $e) {
+            Log::error('Livewire: Failed to mark error as unresolved', [
+                'server_id' => $this->getServer()->id,
+                'error_key' => $errorKey,
+                'error' => $e->getMessage()
+            ]);
+        }
     }
 
     protected function getHeaderActions(): array
