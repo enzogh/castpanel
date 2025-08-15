@@ -414,12 +414,10 @@ class LuaLogService
         }
 
         try {
-            // Récupérer seulement les erreurs visibles (non fermées) directement en base
+            // Récupérer seulement les erreurs ouvertes (non fermées) directement en base
             $query = LuaError::forServer($server->id)
-                ->where(function($q) {
-                    $q->where('status', '!=', 'closed')
-                      ->orWhereNull('closed_at');
-                });
+                ->where('status', '!=', 'closed')
+                ->whereNull('closed_at');
 
             // Appliquer les filtres
             if (isset($filters['resolved'])) {
@@ -444,11 +442,11 @@ class LuaLogService
 
             $logs = $query->orderBy('last_seen', 'desc')->get();
 
-            \Log::channel('lua')->info('Visible logs retrieved from database (filtered by status)', [
+            \Log::channel('lua')->info('Open logs retrieved from database (filtered by status)', [
                 'server_id' => $server->id,
                 'logs_count' => $logs->count(),
                 'filters' => $filters,
-                'query_conditions' => 'status != "closed" OR closed_at IS NULL'
+                'query_conditions' => 'status != "closed" AND closed_at IS NULL'
             ]);
 
             return $logs->map(function($log) {
@@ -1030,37 +1028,125 @@ class LuaLogService
     /**
      * Ferme un log (suppression soft) au lieu de le supprimer physiquement
      */
-    public function deleteLog(Server $server, string $errorKey): bool
+    public function deleteLog(string $errorKey, int $serverId): bool
     {
         try {
             $luaError = LuaError::where('error_key', $errorKey)
-                ->where('server_id', $server->id)
-                ->whereNull('closed_at') // Seulement les erreurs non fermées
+                ->where('server_id', $serverId)
+                ->where('status', '!=', 'closed')
+                ->whereNull('closed_at')
                 ->first();
 
             if (!$luaError) {
-                Log::channel('lua')->warning('Log not found for closing', [
-                    'server_id' => $server->id,
-                    'error_key' => $errorKey
+                \Log::warning('LuaLogService: Cannot find error to close', [
+                    'error_key' => $errorKey,
+                    'server_id' => $serverId
                 ]);
                 return false;
             }
 
-            // Fermer l'erreur au lieu de la supprimer
-            $luaError->softDelete();
-
-            Log::channel('lua')->info('Log closed (hidden from view)', [
-                'server_id' => $server->id,
-                'error_key' => $errorKey,
-                'message' => $luaError->message,
-                'closed_at' => $luaError->closed_at
+            // Fermer l'erreur directement en base (soft delete)
+            $luaError->update([
+                'status' => 'closed',
+                'closed_at' => now()
             ]);
+
+            \Log::info('LuaLogService: Error closed in database', [
+                'error_key' => $errorKey,
+                'server_id' => $serverId,
+                'status' => 'closed',
+                'closed_at' => now()
+            ]);
+
             return true;
 
         } catch (\Exception $e) {
-            Log::channel('lua')->error('Error closing log', [
-                'server_id' => $server->id,
+            \Log::error('LuaLogService: Error closing error', [
                 'error_key' => $errorKey,
+                'server_id' => $serverId,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
+    public function markAsResolved(string $errorKey, int $serverId): bool
+    {
+        try {
+            $luaError = LuaError::where('error_key', $errorKey)
+                ->where('server_id', $serverId)
+                ->where('status', '!=', 'closed')
+                ->whereNull('closed_at')
+                ->first();
+
+            if (!$luaError) {
+                \Log::warning('LuaLogService: Cannot find error to resolve', [
+                    'error_key' => $errorKey,
+                    'server_id' => $serverId
+                ]);
+                return false;
+            }
+
+            // Marquer comme résolu directement en base
+            $luaError->update([
+                'status' => 'resolved',
+                'resolved' => true,
+                'resolved_at' => now()
+            ]);
+
+            \Log::info('LuaLogService: Error marked as resolved in database', [
+                'error_key' => $errorKey,
+                'server_id' => $serverId,
+                'status' => 'resolved'
+            ]);
+
+            return true;
+
+        } catch (\Exception $e) {
+            \Log::error('LuaLogService: Error marking as resolved', [
+                'error_key' => $errorKey,
+                'server_id' => $serverId,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
+    public function reopenError(string $errorKey, int $serverId): bool
+    {
+        try {
+            $luaError = LuaError::where('error_key', $errorKey)
+                ->where('server_id', $serverId)
+                ->where('status', 'closed')
+                ->whereNotNull('closed_at')
+                ->first();
+
+            if (!$luaError) {
+                \Log::warning('LuaLogService: Cannot find closed error to reopen', [
+                    'error_key' => $errorKey,
+                    'server_id' => $serverId
+                ]);
+                return false;
+            }
+
+            // Rouvrir l'erreur directement en base
+            $luaError->update([
+                'status' => 'open',
+                'closed_at' => null
+            ]);
+
+            \Log::info('LuaLogService: Error reopened in database', [
+                'error_key' => $errorKey,
+                'server_id' => $serverId,
+                'status' => 'open'
+            ]);
+
+            return true;
+
+        } catch (\Exception $e) {
+            \Log::error('LuaLogService: Error reopening error', [
+                'error_key' => $errorKey,
+                'server_id' => $serverId,
                 'error' => $e->getMessage()
             ]);
             return false;
