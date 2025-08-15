@@ -791,4 +791,166 @@ class LuaLogService
 
         return $output;
     }
+
+    /**
+     * Marque un log comme résolu
+     */
+    public function markLogAsResolved(Server $server, string $errorKey): bool
+    {
+        try {
+            $logFile = $this->getLogFilePath($server);
+            
+            if (!file_exists($logFile)) {
+                Log::channel('lua')->warning('Log file not found for marking as resolved', [
+                    'server_id' => $server->id,
+                    'error_key' => $errorKey,
+                    'log_file' => $logFile
+                ]);
+                return false;
+            }
+
+            $logs = $this->readLogs($logFile);
+            $updated = false;
+
+            foreach ($logs as &$log) {
+                $logErrorKey = md5(($log['message'] ?? '') . '|' . ($log['addon'] ?? 'unknown'));
+                if ($logErrorKey === $errorKey) {
+                    $log['resolved'] = true;
+                    $log['resolved_at'] = now()->toISOString();
+                    $updated = true;
+                }
+            }
+
+            if ($updated) {
+                $this->writeLogs($logFile, $logs);
+                Log::channel('lua')->info('Log marked as resolved', [
+                    'server_id' => $server->id,
+                    'error_key' => $errorKey
+                ]);
+                return true;
+            }
+
+            Log::channel('lua')->warning('Log not found for marking as resolved', [
+                'server_id' => $server->id,
+                'error_key' => $errorKey
+            ]);
+            return false;
+
+        } catch (\Exception $e) {
+            Log::channel('lua')->error('Error marking log as resolved', [
+                'server_id' => $server->id,
+                'error_key' => $errorKey,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Marque un log comme non résolu
+     */
+    public function markLogAsUnresolved(Server $server, string $errorKey): bool
+    {
+        try {
+            $logFile = $this->getLogFilePath($server);
+            
+            if (!file_exists($logFile)) {
+                Log::channel('lua')->warning('Log file not found for marking as unresolved', [
+                    'server_id' => $server->id,
+                    'error_key' => $errorKey,
+                    'log_file' => $logFile
+                ]);
+                return false;
+            }
+
+            $logs = $this->readLogs($logFile);
+            $updated = false;
+
+            foreach ($logs as &$log) {
+                $logErrorKey = md5(($log['message'] ?? '') . '|' . ($log['addon'] ?? 'unknown'));
+                if ($logErrorKey === $errorKey) {
+                    unset($log['resolved']);
+                    unset($log['resolved_at']);
+                    $updated = true;
+                }
+            }
+
+            if ($updated) {
+                $this->writeLogs($logFile, $logs);
+                Log::channel('lua')->info('Log marked as unresolved', [
+                    'server_id' => $server->id,
+                    'error_key' => $errorKey
+                ]);
+                return true;
+            }
+
+            Log::channel('lua')->warning('Log not found for marking as unresolved', [
+                'server_id' => $server->id,
+                'error_key' => $errorKey
+            ]);
+            return false;
+
+        } catch (\Exception $e) {
+            Log::channel('lua')->error('Error marking log as unresolved', [
+                'server_id' => $server->id,
+                'error_key' => $errorKey,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Supprime un log
+     */
+    public function deleteLog(Server $server, string $errorKey): bool
+    {
+        try {
+            $logFile = $this->getLogFilePath($server);
+            
+            if (!file_exists($logFile)) {
+                Log::channel('lua')->warning('Log file not found for deletion', [
+                    'server_id' => $server->id,
+                    'error_key' => $errorKey,
+                    'log_file' => $logFile
+                ]);
+                return false;
+            }
+
+            $logs = $this->readLogs($logFile);
+            $originalCount = count($logs);
+            $filteredLogs = [];
+
+            foreach ($logs as $log) {
+                $logErrorKey = md5(($log['message'] ?? '') . '|' . ($log['addon'] ?? 'unknown'));
+                if ($logErrorKey !== $errorKey) {
+                    $filteredLogs[] = $log;
+                }
+            }
+
+            if (count($filteredLogs) < $originalCount) {
+                $this->writeLogs($logFile, $filteredLogs);
+                Log::channel('lua')->info('Log deleted', [
+                    'server_id' => $server->id,
+                    'error_key' => $errorKey,
+                    'deleted_count' => $originalCount - count($filteredLogs)
+                ]);
+                return true;
+            }
+
+            Log::channel('lua')->warning('Log not found for deletion', [
+                'server_id' => $server->id,
+                'error_key' => $errorKey
+            ]);
+            return false;
+
+        } catch (\Exception $e) {
+            Log::channel('lua')->error('Error deleting log', [
+                'server_id' => $server->id,
+                'error_key' => $errorKey,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
 }

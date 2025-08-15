@@ -548,7 +548,7 @@ class LuaErrorLogger extends Page
             // Réinitialiser le compteur quand l'erreur est résolue
             $this->consoleErrors[$errorKey]['count'] = 1;
             
-            \Log::info('Livewire: Error marked as resolved', [
+            \Log::info('Livewire: Error marked as resolved in consoleErrors', [
                 'server_id' => $this->getServer()->id,
                 'error_key' => $errorKey,
                 'error_message' => $this->consoleErrors[$errorKey]['error']['message'] ?? 'unknown'
@@ -557,11 +557,29 @@ class LuaErrorLogger extends Page
             // Forcer la mise à jour de l'interface
             $this->dispatch('error-resolved', ['error_key' => $errorKey]);
         } else {
-            \Log::warning('Livewire: Error key not found in consoleErrors', [
+            // L'erreur n'est pas dans consoleErrors, essayer de la marquer comme résolue dans les logs stockés
+            \Log::info('Livewire: Error not in consoleErrors, trying to mark as resolved in stored logs', [
                 'server_id' => $this->getServer()->id,
-                'error_key' => $errorKey,
-                'available_keys' => array_keys($this->consoleErrors)
+                'error_key' => $errorKey
             ]);
+            
+            // Marquer l'erreur comme résolue dans les logs stockés
+            $success = $this->getLuaLogService()->markLogAsResolved($this->getServer(), $errorKey);
+            
+            if ($success) {
+                \Log::info('Livewire: Error marked as resolved in stored logs', [
+                    'server_id' => $this->getServer()->id,
+                    'error_key' => $errorKey
+                ]);
+                
+                // Forcer la mise à jour de l'interface
+                $this->dispatch('error-resolved', ['error_key' => $errorKey]);
+            } else {
+                \Log::warning('Livewire: Failed to mark error as resolved in stored logs', [
+                    'server_id' => $this->getServer()->id,
+                    'error_key' => $errorKey
+                ]);
+            }
         }
         
         $this->processingError = null;
@@ -580,7 +598,7 @@ class LuaErrorLogger extends Page
         if (isset($this->consoleErrors[$errorKey])) {
             $this->consoleErrors[$errorKey]['resolved'] = false;
             
-            \Log::info('Livewire: Error marked as unresolved', [
+            \Log::info('Livewire: Error marked as unresolved in consoleErrors', [
                 'server_id' => $this->getServer()->id,
                 'error_key' => $errorKey,
                 'error_message' => $this->consoleErrors[$errorKey]['error']['message'] ?? 'unknown'
@@ -589,11 +607,29 @@ class LuaErrorLogger extends Page
             // Forcer la mise à jour de l'interface
             $this->dispatch('error-unresolved', ['error_key' => $errorKey]);
         } else {
-            \Log::warning('Livewire: Error key not found in consoleErrors', [
+            // L'erreur n'est pas dans consoleErrors, essayer de la marquer comme non résolue dans les logs stockés
+            \Log::info('Livewire: Error not in consoleErrors, trying to mark as unresolved in stored logs', [
                 'server_id' => $this->getServer()->id,
-                'error_key' => $errorKey,
-                'available_keys' => array_keys($this->consoleErrors)
+                'error_key' => $errorKey
             ]);
+            
+            // Marquer l'erreur comme non résolue dans les logs stockés
+            $success = $this->getLuaLogService()->markLogAsUnresolved($this->getServer(), $errorKey);
+            
+            if ($success) {
+                \Log::info('Livewire: Error marked as unresolved in stored logs', [
+                    'server_id' => $this->getServer()->id,
+                    'error_key' => $errorKey
+                ]);
+                
+                // Forcer la mise à jour de l'interface
+                $this->dispatch('error-unresolved', ['error_key' => $errorKey]);
+            } else {
+                \Log::warning('Livewire: Failed to mark error as unresolved in stored logs', [
+                    'server_id' => $this->getServer()->id,
+                    'error_key' => $errorKey
+                ]);
+            }
         }
         
         $this->processingError = null;
@@ -613,7 +649,7 @@ class LuaErrorLogger extends Page
             // Supprimer l'erreur de la liste
             unset($this->consoleErrors[$errorKey]);
             
-            \Log::info('Livewire: Error deleted', [
+            \Log::info('Livewire: Error deleted from consoleErrors', [
                 'server_id' => $this->getServer()->id,
                 'error_key' => $errorKey,
                 'error_message' => $errorMessage
@@ -622,11 +658,29 @@ class LuaErrorLogger extends Page
             // Forcer la mise à jour de l'interface
             $this->dispatch('error-deleted', ['error_key' => $errorKey]);
         } else {
-            \Log::warning('Livewire: Error key not found in consoleErrors for deletion', [
+            // L'erreur n'est pas dans consoleErrors, essayer de la supprimer des logs stockés
+            \Log::info('Livewire: Error not in consoleErrors, trying to delete from stored logs', [
                 'server_id' => $this->getServer()->id,
-                'error_key' => $errorKey,
-                'available_keys' => array_keys($this->consoleErrors)
+                'error_key' => $errorKey
             ]);
+            
+            // Supprimer l'erreur des logs stockés
+            $success = $this->getLuaLogService()->deleteLog($this->getServer(), $errorKey);
+            
+            if ($success) {
+                \Log::info('Livewire: Error deleted from stored logs', [
+                    'server_id' => $this->getServer()->id,
+                    'error_key' => $errorKey
+                ]);
+                
+                // Forcer la mise à jour de l'interface
+                $this->dispatch('error-deleted', ['error_key' => $errorKey]);
+            } else {
+                \Log::warning('Livewire: Failed to delete error from stored logs', [
+                    'server_id' => $this->getServer()->id,
+                    'error_key' => $errorKey
+                ]);
+            }
         }
     }
     
