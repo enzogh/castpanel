@@ -512,6 +512,22 @@ class LuaErrorLogger extends Page
         }
     }
 
+    public function deleteError(string $errorKey): void
+    {
+        if (isset($this->consoleErrors[$errorKey])) {
+            $errorMessage = $this->consoleErrors[$errorKey]['error']['message'] ?? 'unknown';
+            
+            // Supprimer l'erreur de la liste
+            unset($this->consoleErrors[$errorKey]);
+            
+            \Log::info('Livewire: Error deleted', [
+                'server_id' => $this->getServer()->id,
+                'error_key' => $errorKey,
+                'error_message' => $errorMessage
+            ]);
+        }
+    }
+
     public function updatedSearch(): void
     {
         // La recherche se met à jour automatiquement grâce aux computed properties
