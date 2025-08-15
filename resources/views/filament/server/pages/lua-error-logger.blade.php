@@ -250,12 +250,12 @@
                                         @endif
                                         
                                         <!-- Barre d'actions pour chaque erreur -->
-                                        <div class="flex items-center justify-between bg-gray-50 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+                                        <div class="flex items-center justify-between bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
                                             <!-- Informations de l'erreur -->
                                             <div class="flex items-center space-x-3">
                                                 @if($log['resolved'] ?? false)
-                                                    <span class="inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border border-green-200 dark:border-green-700">
-                                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <span class="inline-flex items-center px-4 py-3 rounded-lg text-base font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border border-green-200 dark:border-green-700">
+                                                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                                                         </svg>
                                                         Résolu
@@ -264,35 +264,45 @@
                                                 
                                                 <!-- Badge de statut -->
                                                 @if(isset($log['count']) && $log['count'] > 1)
-                                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
+                                                    <span class="inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 border border-orange-200 dark:border-orange-700">
                                                         {{ $log['count'] }}x
                                                     </span>
                                                 @endif
                                             </div>
 
                                             <!-- Boutons d'action -->
-                                            <div class="flex items-center space-x-2">
+                                            <div class="flex items-center space-x-3">
                                                 @if($log['resolved'] ?? false)
                                                     <!-- Actions pour erreur résolue -->
                                                     <button
-                                                        wire:click="markAsUnresolved('{{ $log['error_key'] ?? $this->createErrorKey($log) }}')"
-                                                        class="inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 border border-yellow-200 dark:border-yellow-700 hover:bg-yellow-200 dark:hover:bg-yellow-800 transition-all duration-200 hover:scale-105"
+                                                        wire:click="markAsUnresolved('{{ $log['error_key'] }}')"
+                                                        wire:loading.attr="disabled"
+                                                        wire:loading.class="opacity-50 cursor-not-allowed"
+                                                        class="inline-flex items-center px-6 py-3 rounded-lg text-base font-medium bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 border border-yellow-200 dark:border-yellow-700 hover:bg-yellow-200 dark:hover:bg-yellow-800 transition-all duration-200 hover:scale-105 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                                         title="Marquer comme non résolu"
                                                     >
-                                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <svg wire:loading.remove class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                                        </svg>
+                                                        <svg wire:loading class="w-5 h-5 mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                                                         </svg>
                                                         Réouvrir
                                                     </button>
                                                 @else
                                                     <!-- Actions pour erreur non résolue -->
                                                     <button
-                                                        wire:click="markAsResolved('{{ $log['error_key'] ?? $this->createErrorKey($log) }}')"
-                                                        class="inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700 text-white border border-green-600 dark:border-green-700 transition-all duration-200 hover:scale-105 shadow-sm hover:shadow-md"
+                                                        wire:click="markAsResolved('{{ $log['error_key'] }}')"
+                                                        wire:loading.attr="disabled"
+                                                        wire:loading.class="opacity-50 cursor-not-allowed"
+                                                        class="inline-flex items-center px-6 py-3 rounded-lg text-base font-medium bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700 text-white border border-green-600 dark:border-green-700 transition-all duration-200 hover:scale-105 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                                                         title="Marquer cette erreur comme résolue"
                                                     >
-                                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <svg wire:loading.remove class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                                        </svg>
+                                                        <svg wire:loading class="w-5 h-5 mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                                                         </svg>
                                                         Résoudre
                                                     </button>
@@ -300,11 +310,11 @@
 
                                                 <!-- Bouton de suppression -->
                                                 <button
-                                                    wire:click="deleteError('{{ $log['error_key'] ?? $this->createErrorKey($log) }}')"
-                                                    class="inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-700 hover:bg-red-200 dark:hover:bg-red-800 transition-all duration-200 hover:scale-105"
+                                                    wire:click="deleteError('{{ $log['error_key'] }}')"
+                                                    class="inline-flex items-center px-6 py-3 rounded-lg text-base font-medium bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700 text-white border border-red-600 dark:border-red-700 transition-all duration-200 hover:scale-105 shadow-md hover:shadow-lg"
                                                     title="Supprimer cette erreur"
                                                 >
-                                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                                                     </svg>
                                                     Supprimer

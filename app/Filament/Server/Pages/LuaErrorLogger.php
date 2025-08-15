@@ -39,6 +39,7 @@ class LuaErrorLogger extends Page
     public $showResolved = true;
     public $logsPaused = false;
     public $autoScroll = true;
+    public $processingError = null;
     public $consoleErrors = []; // Structure: ['error_key' => ['error' => {...}, 'count' => X, 'last_seen' => timestamp]]
     public $lastConsoleCheck = null; // Timestamp de la dernière vérification de la console
     
@@ -486,6 +487,8 @@ class LuaErrorLogger extends Page
 
     public function markAsResolved(string $errorKey): void
     {
+        $this->processingError = $errorKey;
+        
         if (isset($this->consoleErrors[$errorKey])) {
             $this->consoleErrors[$errorKey]['resolved'] = true;
             // Réinitialiser le compteur quand l'erreur est résolue
@@ -497,10 +500,14 @@ class LuaErrorLogger extends Page
                 'error_message' => $this->consoleErrors[$errorKey]['error']['message'] ?? 'unknown'
             ]);
         }
+        
+        $this->processingError = null;
     }
 
     public function markAsUnresolved(string $errorKey): void
     {
+        $this->processingError = $errorKey;
+        
         if (isset($this->consoleErrors[$errorKey])) {
             $this->consoleErrors[$errorKey]['resolved'] = false;
             
@@ -510,6 +517,8 @@ class LuaErrorLogger extends Page
                 'error_message' => $this->consoleErrors[$errorKey]['error']['message'] ?? 'unknown'
             ]);
         }
+        
+        $this->processingError = null;
     }
 
     public function deleteError(string $errorKey): void
