@@ -55,7 +55,8 @@ class LuaErrorLogger extends Page
         'info' => 0,
         'total' => 0
     ];
-    public array $logs = [];
+    #[Computed]
+    public $logs = [];
 
     protected ?LuaLogService $luaLogService = null;
 
@@ -88,16 +89,13 @@ class LuaErrorLogger extends Page
         try {
             if ($dbConnected) {
                 $this->stats = $this->getStats();
-                $this->logs = $this->getLogs();
             } else {
                 // Utiliser des valeurs par défaut si la DB n'est pas accessible
                 $this->stats = ['critical_errors' => 0, 'warnings' => 0, 'info' => 0, 'total' => 0, 'resolved' => 0];
-                $this->logs = [];
             }
         } catch (\Exception $e) {
             \Log::error('Error getting data', ['error' => $e->getMessage()]);
             $this->stats = ['critical_errors' => 0, 'warnings' => 0, 'info' => 0, 'total' => 0, 'resolved' => 0];
-            $this->logs = [];
         }
         
         \Log::info('Livewire: Page mount completed', [
@@ -468,13 +466,10 @@ class LuaErrorLogger extends Page
                 'server_id' => $this->getServer()->id
             ]);
             
-            // Forcer la mise à jour des propriétés
-            $this->logs = $this->getLogs();
             $this->stats = $this->getStats();
             
             \Log::info('Livewire: refreshData completed', [
                 'server_id' => $this->getServer()->id,
-                'logs_count' => count($this->logs),
                 'stats' => $this->stats
             ]);
             
@@ -493,7 +488,7 @@ class LuaErrorLogger extends Page
                 'total' => 0,
                 'resolved' => 0
             ];
-            $this->logs = [];
+            // Livewire va automatiquement appeler getLogs() grâce à #[Computed]
         }
     }
 
@@ -507,7 +502,7 @@ class LuaErrorLogger extends Page
         ]);
 
         // Actualiser les logs avec le nouveau filtre
-        $this->logs = $this->getLogs();
+        // Livewire va automatiquement appeler getLogs() grâce à #[Computed]
     }
 
     public function monitorConsole(): void
