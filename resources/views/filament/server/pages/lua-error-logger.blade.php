@@ -11,7 +11,7 @@
                     </div>
                     <div class="ml-3">
                         <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Erreurs critiques</p>
-                        <p class="text-2xl font-semibold text-gray-900 dark:text-white">{{ $this->getStats()['critical_errors'] ?? 0 }}</p>
+                        <p class="text-2xl font-semibold text-gray-900 dark:text-white">{{ $stats['critical_errors'] ?? 0 }}</p>
                     </div>
                 </div>
             </div>
@@ -25,7 +25,7 @@
                     </div>
                     <div class="ml-3">
                         <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Avertissements</p>
-                        <p class="text-2xl font-semibold text-gray-900 dark:text-white">{{ $this->getStats()['warnings'] ?? 0 }}</p>
+                        <p class="text-2xl font-semibold text-gray-900 dark:text-white">{{ $stats['warnings'] ?? 0 }}</p>
                     </div>
                 </div>
             </div>
@@ -39,7 +39,7 @@
                     </div>
                     <div class="ml-3">
                         <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Informations</p>
-                        <p class="text-2xl font-semibold text-gray-900 dark:text-white">{{ $this->getStats()['info'] ?? 0 }}</p>
+                        <p class="text-2xl font-semibold text-gray-900 dark:text-white">{{ $stats['info'] ?? 0 }}</p>
                     </div>
                 </div>
             </div>
@@ -53,7 +53,7 @@
                     </div>
                     <div class="ml-3">
                         <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total</p>
-                        <p class="text-2xl font-semibold text-gray-900 dark:text-white">{{ $this->getStats()['total'] ?? 0 }}</p>
+                        <p class="text-2xl font-semibold text-gray-900 dark:text-white">{{ $stats['total'] ?? 0 }}</p>
                     </div>
                 </div>
             </div>
@@ -145,9 +145,9 @@
             <!-- Liste des logs -->
             <div class="p-4">
                 <div class="max-h-96 overflow-y-auto">
-                    @if(count($this->getLogs()) > 0)
+                    @if(count($logs) > 0)
                         <div class="divide-y divide-gray-200 dark:divide-gray-700">
-                            @foreach($this->getLogs() as $log)
+                            @foreach($logs as $log)
                                 <div class="p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors {{ isset($log['count']) ? 'ring-2 ring-blue-300 dark:ring-blue-600' : '' }}">
                                     @if(isset($log['count']) && $log['count'] > 1)
                                         <div class="flex items-center justify-between mb-1">
@@ -224,9 +224,9 @@
             <!-- Top des addons avec erreurs -->
             <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700">
                 <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Top des addons avec erreurs</h3>
-                @if(count($this->getTopAddonErrors()) > 0)
+                @if(count($topAddonErrors) > 0)
                     <div class="space-y-3">
-                        @foreach($this->getTopAddonErrors() as $addon)
+                        @foreach($topAddonErrors as $addon)
                             <div class="flex items-center justify-between">
                                 <span class="text-sm text-gray-700 dark:text-gray-300">{{ $addon['addon'] }}</span>
                                 <span class="text-sm font-medium text-gray-900 dark:text-white">{{ $addon['count'] }}</span>
@@ -241,9 +241,9 @@
             <!-- Top des types d'erreurs -->
             <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700">
                 <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Top des types d'erreurs</h3>
-                @if(count($this->getTopErrorTypes()) > 0)
+                @if(count($topErrorTypes) > 0)
                     <div class="space-y-3">
-                        @foreach($this->getTopErrorTypes() as $errorType)
+                        @foreach($topErrorTypes as $errorType)
                             <div class="flex items-center justify-between">
                                 <span class="text-sm text-gray-700 dark:text-gray-300">{{ $errorType['type'] }}</span>
                                 <span class="text-sm font-medium text-gray-900 dark:text-white">{{ $errorType['count'] }}</span>

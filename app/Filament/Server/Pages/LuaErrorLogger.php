@@ -40,6 +40,17 @@ class LuaErrorLogger extends Page
     public $autoScroll = true;
     public $consoleErrors = []; // Structure: ['error_key' => ['error' => {...}, 'count' => X, 'last_seen' => timestamp]]
     public $lastConsoleCheck = null; // Timestamp de la dernière vérification de la console
+    
+    // Propriétés publiques pour la vue
+    public array $stats = [
+        'critical_errors' => 0,
+        'warnings' => 0,
+        'info' => 0,
+        'total' => 0
+    ];
+    public array $logs = [];
+    public array $topAddonErrors = [];
+    public array $topErrorTypes = [];
 
     protected ?LuaLogService $luaLogService = null;
 
@@ -55,10 +66,16 @@ class LuaErrorLogger extends Page
         // Démarrer immédiatement la surveillance
         $this->startMonitoring();
         
+        // Initialiser les propriétés publiques
+        $this->stats = $this->getStats();
+        $this->logs = $this->getLogs();
+        $this->topAddonErrors = $this->getTopAddonErrors();
+        $this->topErrorTypes = $this->getTopErrorTypes();
+        
         \Log::info('Livewire: Page mount completed', [
             'server_id' => $this->getServer()->id,
             'console_errors_count' => count($this->consoleErrors),
-            'stats' => $this->getStats()
+            'stats' => $this->stats
         ]);
     }
 
@@ -184,7 +201,6 @@ class LuaErrorLogger extends Page
         return $allLogs;
     }
 
-    #[Computed]
     public function getStats(): array
     {
         // Récupérer les stats des logs stockés
@@ -235,13 +251,11 @@ class LuaErrorLogger extends Page
         return $combinedStats;
     }
 
-    #[Computed]
     public function getTopAddonErrors(): array
     {
         return $this->getLuaLogService()->getTopAddonErrors($this->getServer(), 10);
     }
 
-    #[Computed]
     public function getTopErrorTypes(): array
     {
         return $this->getLuaLogService()->getTopErrorTypes($this->getServer(), 10);
