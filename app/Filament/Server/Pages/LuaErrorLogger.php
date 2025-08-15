@@ -197,6 +197,14 @@ class LuaErrorLogger extends Page
             // Combiner les logs stockés avec les erreurs de console
             $allLogs = array_merge($storedLogs, $consoleLogs);
             
+            // S'assurer que tous les logs ont les propriétés nécessaires
+            foreach ($allLogs as &$log) {
+                if (!isset($log['resolved'])) {
+                    $log['resolved'] = false;
+                }
+            }
+            unset($log);
+            
             // Regrouper les erreurs identiques par message et addon pour éviter les doublons
             $groupedLogs = [];
             foreach ($allLogs as $log) {
@@ -210,10 +218,21 @@ class LuaErrorLogger extends Page
                     if (isset($log['timestamp']) && (!isset($groupedLogs[$key]['timestamp']) || strtotime($log['timestamp']) > strtotime($groupedLogs[$key]['timestamp']))) {
                         $groupedLogs[$key]['timestamp'] = $log['timestamp'];
                     }
+                    // Préserver l'error_key si disponible
+                    if (isset($log['error_key']) && !isset($groupedLogs[$key]['error_key'])) {
+                        $groupedLogs[$key]['error_key'] = $log['error_key'];
+                    }
                 } else {
                     // Nouvelle erreur, l'ajouter
                     $log['count'] = $log['count'] ?? 1;
                     $log['first_seen'] = $log['first_seen'] ?? $log['timestamp'];
+                    // S'assurer que tous les logs ont une clé d'action et une propriété resolved
+                    if (!isset($log['error_key'])) {
+                        $log['error_key'] = $key;
+                    }
+                    if (!isset($log['resolved'])) {
+                        $log['resolved'] = false;
+                    }
                     $groupedLogs[$key] = $log;
                 }
             }
@@ -233,16 +252,14 @@ class LuaErrorLogger extends Page
                 return strtotime($timestampB) - strtotime($timestampA);
             });
             
-            return $finalLogs;
-            
             \Log::debug('Livewire: getLogs computed property completed', [
                 'server_id' => $this->getServer()->id,
                 'stored_logs_count' => count($storedLogs),
                 'console_logs_count' => count($consoleLogs),
-                'total_logs_count' => count($allLogs)
+                'grouped_logs_count' => count($finalLogs)
             ]);
             
-            return $allLogs;
+            return $finalLogs;
         } catch (\Exception $e) {
             \Log::error('Livewire: Error in getLogs', [
                 'server_id' => $this->getServer()->id ?? 'unknown',
