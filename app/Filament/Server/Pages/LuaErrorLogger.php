@@ -219,11 +219,24 @@ class LuaErrorLogger extends Page
         // Convertir les erreurs de console en format de log standard
         $consoleLogs = [];
         foreach ($this->consoleErrors as $errorKey => $errorData) {
+            // Filtrer les erreurs de console fermées
+            if (($errorData['status'] ?? 'open') === 'closed' && ($errorData['closed_at'] ?? null) !== null) {
+                \Log::debug('Livewire: Skipping closed console error', [
+                    'server_id' => $this->getServer()->id,
+                    'error_key' => $errorKey,
+                    'status' => $errorData['status'] ?? 'unknown',
+                    'closed_at' => $errorData['closed_at'] ?? 'NULL'
+                ]);
+                continue;
+            }
+            
             $error = $errorData['error'];
             $error['count'] = $errorData['count'];
             $error['first_seen'] = $errorData['first_seen'];
             $error['last_seen'] = $errorData['last_seen'];
             $error['resolved'] = $errorData['resolved'] ?? false;
+            $error['status'] = $errorData['status'] ?? 'open';
+            $error['closed_at'] = $errorData['closed_at'] ?? null;
             $error['error_key'] = $errorKey; // Ajouter la clé pour les actions
             $consoleLogs[] = $error;
         }
@@ -247,6 +260,28 @@ class LuaErrorLogger extends Page
         
         // Le filtrage des erreurs fermées est maintenant fait en base de données
         // Pas besoin de filtrer côté frontend
+        
+        // Filtrage de sécurité côté frontend pour masquer les erreurs fermées
+        $allLogs = array_filter($allLogs, function($log) {
+            $isClosed = ($log['status'] ?? 'open') === 'closed' && ($log['closed_at'] ?? null) !== null;
+            
+            if ($isClosed) {
+                \Log::debug('Livewire: Filtering out closed error on frontend', [
+                    'server_id' => $this->getServer()->id,
+                    'log_id' => $log['id'] ?? 'unknown',
+                    'status' => $log['status'] ?? 'unknown',
+                    'closed_at' => $log['closed_at'] ?? 'NULL',
+                    'message' => substr($log['message'] ?? 'unknown', 0, 50)
+                ]);
+            }
+            
+            return !$isClosed;
+        });
+        
+        \Log::info('Livewire: Frontend filtering completed', [
+            'server_id' => $this->getServer()->id,
+            'logs_after_frontend_filter' => count($allLogs)
+        ]);
         
         \Log::info('Livewire: Logs prepared for display', [
             'server_id' => $this->getServer()->id,
