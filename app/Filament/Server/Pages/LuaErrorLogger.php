@@ -26,7 +26,7 @@ class LuaErrorLogger extends Page
     // Méthode appelée automatiquement par Livewire pour le polling
     public function updated($property): void
     {
-        \Log->info('Livewire: Property updated', [
+        \Log::info('Livewire: Property updated', [
             'server_id' => $this->getServer()->id,
             'property' => $property,
             'timestamp' => now()->toISOString()
@@ -80,14 +80,14 @@ class LuaErrorLogger extends Page
 
     protected function getLuaLogService(): LuaLogService
     {
-        \Log->debug('Livewire: getLuaLogService called', [
+        \Log::debug('Livewire: getLuaLogService called', [
             'server_id' => $this->getServer()->id,
             'service_exists' => $this->luaLogService ? 'yes' : 'no'
         ]);
         
         if (!$this->luaLogService) {
             $this->luaLogService = app(LuaLogService::class);
-            \Log->debug('Livewire: LuaLogService created', [
+            \Log::debug('Livewire: LuaLogService created', [
                 'server_id' => $this->getServer()->id
             ]);
         }
@@ -127,7 +127,7 @@ class LuaErrorLogger extends Page
     public function getServer(): Server
     {
         $server = Filament::getTenant();
-        \Log->debug('Livewire: getServer called', [
+        \Log::debug('Livewire: getServer called', [
             'server_id' => $server->id,
             'egg_name' => $server->egg->name ?? 'no egg'
         ]);
@@ -137,7 +137,7 @@ class LuaErrorLogger extends Page
     #[Computed]
     public function getLogs(): array
     {
-        \Log->debug('Livewire: getLogs computed property called', [
+        \Log::debug('Livewire: getLogs computed property called', [
             'server_id' => $this->getServer()->id,
             'filters' => [
                 'level' => $this->levelFilter,
@@ -175,7 +175,7 @@ class LuaErrorLogger extends Page
             return strtotime($timestampB) - strtotime($timestampA);
         });
         
-        \Log->debug('Livewire: getLogs computed property completed', [
+        \Log::debug('Livewire: getLogs computed property completed', [
             'server_id' => $this->getServer()->id,
             'stored_logs_count' => count($storedLogs),
             'total_logs_count' => count($allLogs)
@@ -225,7 +225,7 @@ class LuaErrorLogger extends Page
             'total' => $storedStats['total'] + $consoleStats['total']
         ];
         
-        \Log->debug('Livewire: getStats computed property', [
+        \Log::debug('Livewire: getStats computed property', [
             'server_id' => $this->getServer()->id,
             'stored_stats' => $storedStats,
             'console_stats' => $consoleStats,
@@ -249,7 +249,7 @@ class LuaErrorLogger extends Page
 
     public function refreshLogs(): void
     {
-        \Log->info('Livewire: refreshLogs called', [
+        \Log::info('Livewire: refreshLogs called', [
             'server_id' => $this->getServer()->id,
             'timestamp' => now()->toISOString(),
             'last_check_time' => $this->lastConsoleCheck
@@ -259,21 +259,21 @@ class LuaErrorLogger extends Page
         $this->monitorConsole();
         $this->dispatch('logs-refreshed');
         
-        \Log->info('Livewire: refreshLogs completed', [
+        \Log::info('Livewire: refreshLogs completed', [
             'server_id' => $this->getServer()->id
         ]);
     }
 
     public function monitorConsole(): void
     {
-        \Log->info('Livewire: monitorConsole called', [
+        \Log::info('Livewire: monitorConsole called', [
             'server_id' => $this->getServer()->id,
             'logs_paused' => $this->logsPaused,
             'timestamp' => now()->toISOString()
         ]);
         
         if (!$this->logsPaused) {
-            \Log->info('Livewire: Starting console monitoring', [
+            \Log::info('Livewire: Starting console monitoring', [
                 'server_id' => $this->getServer()->id,
                 'logs_paused' => $this->logsPaused,
                 'last_check_time' => $this->lastConsoleCheck
@@ -284,7 +284,7 @@ class LuaErrorLogger extends Page
             // Mettre à jour le timestamp de la dernière vérification
             $this->lastConsoleCheck = now()->toISOString();
             
-            \Log->info('Livewire: Console monitoring completed', [
+            \Log::info('Livewire: Console monitoring completed', [
                 'server_id' => $this->getServer()->id,
                 'new_errors_count' => count($newErrors),
                 'new_check_time' => $this->lastConsoleCheck
@@ -299,7 +299,7 @@ class LuaErrorLogger extends Page
                     $this->consoleErrors[$errorKey]['count']++;
                     $this->consoleErrors[$errorKey]['last_seen'] = now()->toISOString();
                     
-                    \Log->info('Livewire: Incrementing error count', [
+                    \Log::info('Livewire: Incrementing error count', [
                         'server_id' => $this->getServer()->id,
                         'error_message' => $error['message'],
                         'error_addon' => $error['addon'] ?? 'unknown',
@@ -314,7 +314,7 @@ class LuaErrorLogger extends Page
                         'last_seen' => now()->toISOString()
                     ];
                     
-                    \Log->info('Livewire: Adding new error', [
+                    \Log::info('Livewire: Adding new error', [
                         'server_id' => $this->getServer()->id,
                         'error_message' => $error['message'],
                         'error_addon' => $error['addon'] ?? 'unknown'
@@ -336,7 +336,7 @@ class LuaErrorLogger extends Page
                 $this->consoleErrors = array_slice($this->consoleErrors, -100);
             }
         } else {
-            \Log->debug('Livewire: Console monitoring paused', [
+            \Log::debug('Livewire: Console monitoring paused', [
                 'server_id' => $this->getServer()->id
             ]);
         }
