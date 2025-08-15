@@ -408,52 +408,69 @@ class LuaLogService
      */
     public function getLogs(Server $server, array $filters = []): array
     {
-        // Vérifier que c'est un serveur Garry's Mod
-        if (!$this->isGarrysModServer($server)) {
+        try {
+            // Vérifier que c'est un serveur Garry's Mod
+            if (!$this->isGarrysModServer($server)) {
+                return [];
+            }
+
+            $query = LuaError::forServer($server->id);
+
+            // Appliquer les filtres
+            if (isset($filters['resolved'])) {
+                if ($filters['resolved']) {
+                    $query->resolved();
+                } else {
+                    $query->unresolved();
+                }
+            }
+
+            if (isset($filters['search']) && !empty($filters['search'])) {
+                $search = $filters['search'];
+                $query->where(function($q) use ($search) {
+                    $q->where('message', 'like', "%{$search}%")
+                      ->orWhere('addon', 'like', "%{$search}%");
+                });
+            }
+
+            if (isset($filters['time']) && !empty($filters['time'])) {
+                $query = $this->applyTimeFilter($query, $filters['time']);
+            }
+
+            $logs = $query->orderBy('last_seen', 'desc')->get();
+
+            \Log::channel('lua')->info('Logs retrieved from database', [
+                'server_id' => $server->id,
+                'logs_count' => $logs->count(),
+                'filters' => $filters
+            ]);
+
+            return $logs->map(function($log) {
+                return [
+                    'id' => $log->id,
+                    'error_key' => $log->error_key,
+                    'level' => $log->level,
+                    'message' => $log->message,
+                    'addon' => $log->addon,
+                    'stack_trace' => $log->stack_trace,
+                    'count' => $log->count,
+                    'first_seen' => $log->first_seen,
+                    'last_seen' => $log->last_seen,
+                    'resolved' => $log->resolved,
+                    'resolved_at' => $log->resolved_at,
+                    'server_id' => $log->server_id,
+                ];
+            })->toArray();
+
+        } catch (\Exception $e) {
+            \Log::channel('lua')->error('Error retrieving logs from database', [
+                'server_id' => $server->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
             return [];
         }
-
-        $query = LuaError::forServer($server->id);
-
-        // Appliquer les filtres
-        if (isset($filters['resolved'])) {
-            if ($filters['resolved']) {
-                $query->resolved();
-            } else {
-                $query->unresolved();
-            }
-        }
-
-        if (isset($filters['search']) && !empty($filters['search'])) {
-            $search = $filters['search'];
-            $query->where(function($q) use ($search) {
-                $q->where('message', 'like', "%{$search}%")
-                  ->orWhere('addon', 'like', "%{$search}%");
-            });
-        }
-
-        if (isset($filters['time']) && !empty($filters['time'])) {
-            $query = $this->applyTimeFilter($query, $filters['time']);
-        }
-
-        $logs = $query->orderBy('last_seen', 'desc')->get();
-
-        return $logs->map(function($log) {
-            return [
-                'id' => $log->id,
-                'error_key' => $log->error_key,
-                'level' => $log->level,
-                'message' => $log->message,
-                'addon' => $log->addon,
-                'stack_trace' => $log->stack_trace,
-                'count' => $log->count,
-                'first_seen' => $log->first_seen,
-                'last_seen' => $log->last_seen,
-                'resolved' => $log->resolved,
-                'resolved_at' => $log->resolved_at,
-                'server_id' => $log->server_id,
-            ];
-        })->toArray();
     }
 
     /**
@@ -461,35 +478,47 @@ class LuaLogService
      */
     public function addLog(Server $server, string $level, string $message, ?string $addon = null, ?string $stackTrace = null): void
     {
-        if (!$this->isGarrysModServer($server)) {
-            return;
+        try {
+            if (!$this->isGarrysModServer($server)) {
+                return;
+            }
+
+            $errorKey = md5($message . '|' . ($addon ?? 'unknown'));
+
+            // Créer ou mettre à jour l'erreur
+            $luaError = LuaError::createOrUpdate(
+                $server->id,
+                $errorKey,
+                $message,
+                $addon,
+                $stackTrace,
+                $level
+            );
+
+            // Si l'erreur existe déjà et n'est pas résolue, incrémenter le compteur
+            if ($luaError->wasRecentlyCreated === false && !$luaError->resolved) {
+                $luaError->incrementCount();
+            }
+
+            // Logger aussi dans Laravel pour le debugging
+            Log::channel('lua')->info('Lua log added to database', [
+                'server_id' => $server->id,
+                'error_key' => $errorKey,
+                'message' => $message,
+                'addon' => $addon,
+                'count' => $luaError->count,
+                'resolved' => $luaError->resolved,
+            ]);
+
+        } catch (\Exception $e) {
+            Log::channel('lua')->error('Error adding log to database', [
+                'server_id' => $server->id,
+                'message' => $message,
+                'addon' => $addon,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
         }
-
-        $errorKey = md5($message . '|' . ($addon ?? 'unknown'));
-
-        // Créer ou mettre à jour l'erreur
-        $luaError = LuaError::createOrUpdate(
-            $server->id,
-            $errorKey,
-            $message,
-            $addon,
-            $stackTrace,
-            $level
-        );
-
-        // Si l'erreur existe déjà et n'est pas résolue, incrémenter le compteur
-        if ($luaError->wasRecentlyCreated === false && !$luaError->resolved) {
-            $luaError->incrementCount();
-        }
-
-        // Logger aussi dans Laravel pour le debugging
-        Log::channel('lua')->info('Lua log added to database', [
-            'server_id' => $server->id,
-            'error_key' => $errorKey,
-            'message' => $message,
-            'addon' => $addon,
-            'count' => $luaError->count,
-        ]);
     }
 
     /**

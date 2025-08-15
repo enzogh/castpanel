@@ -63,6 +63,13 @@ class LuaErrorLogger extends Page
         
         $this->luaLogService = app(LuaLogService::class);
         
+        // Tester la connexion à la base de données
+        if (!$this->testDatabaseConnection()) {
+            \Log::error('Livewire: Database connection failed during mount', [
+                'server_id' => $this->getServer()->id
+            ]);
+        }
+        
         // Démarrer immédiatement la surveillance
         $this->startMonitoring();
         
@@ -71,7 +78,7 @@ class LuaErrorLogger extends Page
             $this->stats = $this->getStats();
         } catch (\Exception $e) {
             \Log::error('Error getting stats', ['error' => $e->getMessage()]);
-            $this->stats = ['critical_errors' => 0, 'warnings' => 0, 'info' => 0, 'total' => 0];
+            $this->stats = ['critical_errors' => 0, 'warnings' => 0, 'info' => 0, 'total' => 0, 'resolved' => 0];
         }
         
         try {
@@ -80,8 +87,6 @@ class LuaErrorLogger extends Page
             \Log::error('Error getting logs', ['error' => $e->getMessage()]);
             $this->logs = [];
         }
-        
-
         
         \Log::info('Livewire: Page mount completed', [
             'server_id' => $this->getServer()->id,
@@ -385,19 +390,38 @@ class LuaErrorLogger extends Page
      */
     public function refreshData(): void
     {
-        \Log::info('Livewire: refreshData called', [
-            'server_id' => $this->getServer()->id
-        ]);
-        
-        // Forcer la mise à jour des propriétés
-        $this->logs = $this->getLogs();
-        $this->stats = $this->getStats();
-        
-        \Log::info('Livewire: refreshData completed', [
-            'server_id' => $this->getServer()->id,
-            'logs_count' => count($this->logs),
-            'stats' => $this->stats
-        ]);
+        try {
+            \Log::info('Livewire: refreshData called', [
+                'server_id' => $this->getServer()->id
+            ]);
+            
+            // Forcer la mise à jour des propriétés
+            $this->logs = $this->getLogs();
+            $this->stats = $this->getStats();
+            
+            \Log::info('Livewire: refreshData completed', [
+                'server_id' => $this->getServer()->id,
+                'logs_count' => count($this->logs),
+                'stats' => $this->stats
+            ]);
+            
+        } catch (\Exception $e) {
+            \Log::error('Livewire: Error in refreshData', [
+                'server_id' => $this->getServer()->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            // En cas d'erreur, essayer de récupérer au moins les stats de base
+            $this->stats = [
+                'critical_errors' => 0,
+                'warnings' => 0,
+                'info' => 0,
+                'total' => 0,
+                'resolved' => 0
+            ];
+            $this->logs = [];
+        }
     }
 
     public function monitorConsole(): void
@@ -770,6 +794,26 @@ class LuaErrorLogger extends Page
             'txt' => 'text/plain',
             'default' => 'application/json',
         };
+    }
+
+    /**
+     * Teste la connexion à la base de données
+     */
+    public function testDatabaseConnection(): bool
+    {
+        try {
+            $test = \DB::connection()->getPdo();
+            \Log::info('Livewire: Database connection test successful', [
+                'server_id' => $this->getServer()->id
+            ]);
+            return true;
+        } catch (\Exception $e) {
+            \Log::error('Livewire: Database connection test failed', [
+                'server_id' => $this->getServer()->id,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
     }
 
     /**
