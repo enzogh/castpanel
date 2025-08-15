@@ -291,18 +291,14 @@
                                             <div class="flex items-center space-x-2 mb-1">
                                                 @if(isset($log['count']) && $log['count'] > 1)
                                                     <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
-                                                        Erreur répétée
+                                                        Erreur répétée ({{ $log['count'] }}x)
                                                     </span>
                                                 @else
                                                     <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium {{ $log['level'] === 'error' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' : ($log['level'] === 'warning' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200') }}">
                                                         {{ ucfirst($log['level'] ?? 'info') }}
                                                     </span>
                                                 @endif
-                                                @if(isset($log['count']) && $log['count'] > 1)
-                                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
-                                                        {{ $log['count'] }}x
-                                                    </span>
-                                                @elseif(isset($log['addon']) && $log['addon'] !== 'unknown')
+                                                @if(isset($log['addon']) && $log['addon'] !== 'unknown')
                                                     <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
                                                         {{ $log['addon'] }}
                                                     </span>

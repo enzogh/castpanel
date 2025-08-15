@@ -194,22 +194,46 @@ class LuaErrorLogger extends Page
                 $consoleLogs[] = $error;
             }
             
-            // Combiner les logs stockés avec les erreurs de console (déjà comptées)
+            // Combiner les logs stockés avec les erreurs de console
             $allLogs = array_merge($storedLogs, $consoleLogs);
+            
+            // Regrouper les erreurs identiques par message et addon pour éviter les doublons
+            $groupedLogs = [];
+            foreach ($allLogs as $log) {
+                $key = $this->createErrorKey($log);
+                
+                if (isset($groupedLogs[$key])) {
+                    // Erreur déjà existante, incrémenter le compteur
+                    $groupedLogs[$key]['count'] = ($groupedLogs[$key]['count'] ?? 1) + ($log['count'] ?? 1);
+                    $groupedLogs[$key]['last_seen'] = $log['last_seen'] ?? $log['timestamp'];
+                    // Garder le timestamp le plus récent
+                    if (isset($log['timestamp']) && (!isset($groupedLogs[$key]['timestamp']) || strtotime($log['timestamp']) > strtotime($groupedLogs[$key]['timestamp']))) {
+                        $groupedLogs[$key]['timestamp'] = $log['timestamp'];
+                    }
+                } else {
+                    // Nouvelle erreur, l'ajouter
+                    $log['count'] = $log['count'] ?? 1;
+                    $log['first_seen'] = $log['first_seen'] ?? $log['timestamp'];
+                    $groupedLogs[$key] = $log;
+                }
+            }
             
             // Filtrer les erreurs résolues si nécessaire
             if (!$this->showResolved) {
-                $allLogs = array_filter($allLogs, function($log) {
+                $groupedLogs = array_filter($groupedLogs, function($log) {
                     return !($log['resolved'] ?? false);
                 });
             }
             
-            // Trier par timestamp (plus récent en premier)
-            usort($allLogs, function($a, $b) {
+            // Convertir en tableau indexé et trier par timestamp (plus récent en premier)
+            $finalLogs = array_values($groupedLogs);
+            usort($finalLogs, function($a, $b) {
                 $timestampA = $a['last_seen'] ?? $a['timestamp'] ?? '';
                 $timestampB = $b['last_seen'] ?? $b['timestamp'] ?? '';
                 return strtotime($timestampB) - strtotime($timestampA);
             });
+            
+            return $finalLogs;
             
             \Log::debug('Livewire: getLogs computed property completed', [
                 'server_id' => $this->getServer()->id,
@@ -354,16 +378,18 @@ class LuaErrorLogger extends Page
                 $errorKey = $this->createErrorKey($error);
                 
                 if (isset($this->consoleErrors[$errorKey])) {
-                    // Erreur déjà existante, incrémenter le compteur
-                    $this->consoleErrors[$errorKey]['count']++;
-                    $this->consoleErrors[$errorKey]['last_seen'] = now()->toISOString();
-                    
-                    \Log::info('Livewire: Incrementing error count', [
-                        'server_id' => $this->getServer()->id,
-                        'error_message' => $error['message'],
-                        'error_addon' => $error['addon'] ?? 'unknown',
-                        'new_count' => $this->consoleErrors[$errorKey]['count']
-                    ]);
+                    // Erreur déjà existante, incrémenter le compteur seulement si elle n'est pas résolue
+                    if (!($this->consoleErrors[$errorKey]['resolved'] ?? false)) {
+                        $this->consoleErrors[$errorKey]['count']++;
+                        $this->consoleErrors[$errorKey]['last_seen'] = now()->toISOString();
+                        
+                        \Log::info('Livewire: Incrementing error count', [
+                            'server_id' => $this->getServer()->id,
+                            'error_message' => $error['message'],
+                            'error_addon' => $error['addon'] ?? 'unknown',
+                            'new_count' => $this->consoleErrors[$errorKey]['count']
+                        ]);
+                    }
                 } else {
                     // Nouvelle erreur, l'ajouter avec un compteur initial
                     $this->consoleErrors[$errorKey] = [
@@ -445,6 +471,8 @@ class LuaErrorLogger extends Page
     {
         if (isset($this->consoleErrors[$errorKey])) {
             $this->consoleErrors[$errorKey]['resolved'] = true;
+            // Réinitialiser le compteur quand l'erreur est résolue
+            $this->consoleErrors[$errorKey]['count'] = 1;
             
             \Log::info('Livewire: Error marked as resolved', [
                 'server_id' => $this->getServer()->id,
