@@ -204,24 +204,9 @@
                             @foreach($logs as $log)
                                 <div class="p-4 hover:bg-gray-700/50 dark:hover:bg-gray-600/50 transition-colors {{ isset($log['count']) ? 'ring-2 ring-blue-300 dark:ring-blue-600' : '' }}">
                                     @if(isset($log['count']) && $log['count'] > 1)
-                                        <div class="flex items-center justify-between mb-1">
-                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
-                                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                                                </svg>
-                                                Erreur répétée ({{ $log['count'] }}x)
-                                            </span>
+                                        <div class="flex items-center justify-end mb-1">
                                             <span class="text-xs text-gray-500 dark:text-gray-400">
                                                 Première fois: {{ \Carbon\Carbon::parse($log['first_seen'])->format('H:i:s') }}
-                                            </span>
-                                        </div>
-                                    @elseif(isset($log['count']) && $log['count'] === 1)
-                                        <div class="flex items-center justify-between mb-1">
-                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                                                </svg>
-                                                Nouvelle erreur
                                             </span>
                                         </div>
                                     @endif
@@ -242,7 +227,11 @@
                                                         {{ ucfirst($log['level'] ?? 'info') }}
                                                     </span>
                                                 @endif
-                                                @if(isset($log['addon']) && $log['addon'] !== 'unknown')
+                                                @if(isset($log['count']) && $log['count'] > 1)
+                                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
+                                                        {{ $log['count'] }}x
+                                                    </span>
+                                                @elseif(isset($log['addon']) && $log['addon'] !== 'unknown')
                                                     <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
                                                         {{ $log['addon'] }}
                                                     </span>
@@ -278,8 +267,6 @@
                 </div>
             </div>
         </div>
-
-
     </div>
 
     <script>
