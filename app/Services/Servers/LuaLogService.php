@@ -3,6 +3,7 @@
 namespace App\Services\Servers;
 
 use App\Models\Server;
+use App\Models\LuaError;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -403,7 +404,7 @@ class LuaLogService
     }
 
     /**
-     * Récupère les logs Lua d'un serveur
+     * Récupère les logs Lua d'un serveur depuis la base de données
      */
     public function getLogs(Server $server, array $filters = []): array
     {
@@ -412,19 +413,51 @@ class LuaLogService
             return [];
         }
 
-        $logPath = $this->getLogPath($server);
-        
-        if (!Storage::disk('local')->exists($logPath)) {
-            return [];
+        $query = LuaError::forServer($server->id);
+
+        // Appliquer les filtres
+        if (isset($filters['resolved'])) {
+            if ($filters['resolved']) {
+                $query->resolved();
+            } else {
+                $query->unresolved();
+            }
         }
 
-        $logs = $this->parseLogFile($logPath);
-        
-        return $this->applyFilters($logs, $filters);
+        if (isset($filters['search']) && !empty($filters['search'])) {
+            $search = $filters['search'];
+            $query->where(function($q) use ($search) {
+                $q->where('message', 'like', "%{$search}%")
+                  ->orWhere('addon', 'like', "%{$search}%");
+            });
+        }
+
+        if (isset($filters['time']) && !empty($filters['time'])) {
+            $query = $this->applyTimeFilter($query, $filters['time']);
+        }
+
+        $logs = $query->orderBy('last_seen', 'desc')->get();
+
+        return $logs->map(function($log) {
+            return [
+                'id' => $log->id,
+                'error_key' => $log->error_key,
+                'level' => $log->level,
+                'message' => $log->message,
+                'addon' => $log->addon,
+                'stack_trace' => $log->stack_trace,
+                'count' => $log->count,
+                'first_seen' => $log->first_seen,
+                'last_seen' => $log->last_seen,
+                'resolved' => $log->resolved,
+                'resolved_at' => $log->resolved_at,
+                'server_id' => $log->server_id,
+            ];
+        })->toArray();
     }
 
     /**
-     * Ajoute un nouveau log
+     * Ajoute un nouveau log en base de données
      */
     public function addLog(Server $server, string $level, string $message, ?string $addon = null, ?string $stackTrace = null): void
     {
@@ -432,22 +465,31 @@ class LuaLogService
             return;
         }
 
-        $logEntry = [
-            'timestamp' => now()->toISOString(),
-            'level' => $level,
+        $errorKey = md5($message . '|' . ($addon ?? 'unknown'));
+
+        // Créer ou mettre à jour l'erreur
+        $luaError = LuaError::createOrUpdate(
+            $server->id,
+            $errorKey,
+            $message,
+            $addon,
+            $stackTrace,
+            $level
+        );
+
+        // Si l'erreur existe déjà et n'est pas résolue, incrémenter le compteur
+        if ($luaError->wasRecentlyCreated === false && !$luaError->resolved) {
+            $luaError->incrementCount();
+        }
+
+        // Logger aussi dans Laravel pour le debugging
+        Log::channel('lua')->info('Lua log added to database', [
+            'server_id' => $server->id,
+            'error_key' => $errorKey,
             'message' => $message,
             'addon' => $addon,
-            'stack_trace' => $stackTrace,
-            'server_id' => $server->id,
-        ];
-
-        $logPath = $this->getLogPath($server);
-        
-        // Ajouter le log au fichier
-        $this->appendToLogFile($logPath, $logEntry);
-        
-        // Logger aussi dans Laravel pour le debugging
-        Log::channel('lua')->info('Lua log added', $logEntry);
+            'count' => $luaError->count,
+        ]);
     }
 
     /**
@@ -690,6 +732,33 @@ class LuaLogService
     }
 
     /**
+     * Applique un filtre de temps à une requête Eloquent
+     */
+    private function applyTimeFilter($query, string $timeFilter)
+    {
+        $now = now();
+        
+        switch ($timeFilter) {
+            case '1h':
+                $cutoff = $now->subHour();
+                break;
+            case '24h':
+                $cutoff = $now->subDay();
+                break;
+            case '7d':
+                $cutoff = $now->subWeek();
+                break;
+            case '30d':
+                $cutoff = $now->subMonth();
+                break;
+            default:
+                return $query;
+        }
+
+        return $query->where('last_seen', '>=', $cutoff);
+    }
+
+    /**
      * Filtre les logs par temps
      */
     private function filterByTime(array $logs, string $timeFilter): array
@@ -806,49 +875,32 @@ class LuaLogService
     }
 
     /**
-     * Marque un log comme résolu
+     * Marque un log comme résolu en base de données
      */
     public function markLogAsResolved(Server $server, string $errorKey): bool
     {
         try {
-            $logPath = $this->getLogPath($server);
-            
-            if (!Storage::disk('local')->exists($logPath)) {
-                Log::channel('lua')->warning('Log file not found for marking as resolved', [
+            $luaError = LuaError::where('error_key', $errorKey)
+                ->where('server_id', $server->id)
+                ->first();
+
+            if (!$luaError) {
+                Log::channel('lua')->warning('Log not found for marking as resolved', [
                     'server_id' => $server->id,
-                    'error_key' => $errorKey,
-                    'log_path' => $logPath
+                    'error_key' => $errorKey
                 ]);
                 return false;
             }
 
-            $logs = $this->parseLogFile($logPath);
-            $updated = false;
+            $luaError->markAsResolved();
 
-            foreach ($logs as &$log) {
-                $logErrorKey = md5(($log['message'] ?? '') . '|' . ($log['addon'] ?? 'unknown'));
-                if ($logErrorKey === $errorKey) {
-                    $log['resolved'] = true;
-                    $log['resolved_at'] = now()->toISOString();
-                    $updated = true;
-                }
-            }
-
-            if ($updated) {
-                // Réécrire le fichier complet avec les modifications
-                $this->writeLogFile($logPath, $logs);
-                Log::channel('lua')->info('Log marked as resolved', [
-                    'server_id' => $server->id,
-                    'error_key' => $errorKey
-                ]);
-                return true;
-            }
-
-            Log::channel('lua')->warning('Log not found for marking as resolved', [
+            Log::channel('lua')->info('Log marked as resolved in database', [
                 'server_id' => $server->id,
-                'error_key' => $errorKey
+                'error_key' => $errorKey,
+                'message' => $luaError->message
             ]);
-            return false;
+
+            return true;
 
         } catch (\Exception $e) {
             Log::channel('lua')->error('Error marking log as resolved', [
@@ -861,49 +913,32 @@ class LuaLogService
     }
 
     /**
-     * Marque un log comme non résolu
+     * Marque un log comme non résolu en base de données
      */
     public function markLogAsUnresolved(Server $server, string $errorKey): bool
     {
         try {
-            $logPath = $this->getLogPath($server);
-            
-            if (!Storage::disk('local')->exists($logPath)) {
-                Log::channel('lua')->warning('Log file not found for marking as unresolved', [
+            $luaError = LuaError::where('error_key', $errorKey)
+                ->where('server_id', $server->id)
+                ->first();
+
+            if (!$luaError) {
+                Log::channel('lua')->warning('Log not found for marking as unresolved', [
                     'server_id' => $server->id,
-                    'error_key' => $errorKey,
-                    'log_path' => $logPath
+                    'error_key' => $errorKey
                 ]);
                 return false;
             }
 
-            $logs = $this->parseLogFile($logPath);
-            $updated = false;
+            $luaError->markAsUnresolved();
 
-            foreach ($logs as &$log) {
-                $logErrorKey = md5(($log['message'] ?? '') . '|' . ($log['addon'] ?? 'unknown'));
-                if ($logErrorKey === $errorKey) {
-                    unset($log['resolved']);
-                    unset($log['resolved_at']);
-                    $updated = true;
-                }
-            }
-
-            if ($updated) {
-                // Réécrire le fichier complet avec les modifications
-                $this->writeLogFile($logPath, $logs);
-                Log::channel('lua')->info('Log marked as unresolved', [
-                    'server_id' => $server->id,
-                    'error_key' => $errorKey
-                ]);
-                return true;
-            }
-
-            Log::channel('lua')->warning('Log not found for marking as unresolved', [
+            Log::channel('lua')->info('Log marked as unresolved in database', [
                 'server_id' => $server->id,
-                'error_key' => $errorKey
+                'error_key' => $errorKey,
+                'message' => $luaError->message
             ]);
-            return false;
+
+            return true;
 
         } catch (\Exception $e) {
             Log::channel('lua')->error('Error marking log as unresolved', [
@@ -916,54 +951,41 @@ class LuaLogService
     }
 
     /**
-     * Supprime un log
+     * Supprime un log de la base de données
      */
     public function deleteLog(Server $server, string $errorKey): bool
     {
         try {
-            $logPath = $this->getLogPath($server);
-            
-            if (!Storage::disk('local')->exists($logPath)) {
-                Log::channel('lua')->warning('Log file not found for deletion', [
+            $luaError = LuaError::where('error_key', $errorKey)
+                ->where('server_id', $server->id)
+                ->first();
+
+            if (!$luaError) {
+                Log::channel('lua')->warning('Log not found for deletion', [
                     'server_id' => $server->id,
-                    'error_key' => $errorKey,
-                    'log_path' => $logPath
+                    'error_key' => $errorKey
                 ]);
                 return false;
             }
 
-            $logs = $this->parseLogFile($logPath);
-            $originalCount = count($logs);
-            $filteredLogs = [];
+            $deleted = $luaError->delete();
 
-            foreach ($logs as $log) {
-                $logErrorKey = md5(($log['message'] ?? '') . '|' . ($log['addon'] ?? 'unknown'));
-                if ($logErrorKey !== $errorKey) {
-                    $filteredLogs[] = $log;
-                }
-            }
-
-            if (count($filteredLogs) < $originalCount) {
-                // Réécrire le fichier complet avec les modifications
-                $this->writeLogFile($logPath, $filteredLogs);
-                Log::channel('lua')->info('Log deleted', [
+            if ($deleted) {
+                Log::channel('lua')->info('Log deleted from database', [
                     'server_id' => $server->id,
                     'error_key' => $errorKey,
-                    'deleted_count' => $originalCount - count($filteredLogs)
+                    'message' => $luaError->message
                 ]);
                 return true;
             }
 
-            Log::channel('lua')->warning('Log not found for deletion', [
-                'server_id' => $server->id,
-                'error_key' => $errorKey
-            ]);
             return false;
 
         } catch (\Exception $e) {
             Log::channel('lua')->error('Error deleting log', [
                 'server_id' => $server->id,
-                'error_key' => $errorKey
+                'error_key' => $errorKey,
+                'error' => $e->getMessage()
             ]);
             return false;
         }
