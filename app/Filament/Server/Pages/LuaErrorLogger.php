@@ -55,7 +55,6 @@ class LuaErrorLogger extends Page
         'info' => 0,
         'total' => 0
     ];
-    #[Computed]
     public $logs = [];
 
     protected ?LuaLogService $luaLogService = null;
@@ -89,13 +88,16 @@ class LuaErrorLogger extends Page
         try {
             if ($dbConnected) {
                 $this->stats = $this->getStats();
+                $this->logs = $this->getLogs();
             } else {
                 // Utiliser des valeurs par défaut si la DB n'est pas accessible
                 $this->stats = ['critical_errors' => 0, 'warnings' => 0, 'info' => 0, 'total' => 0, 'resolved' => 0];
+                $this->logs = [];
             }
         } catch (\Exception $e) {
             \Log::error('Error getting data', ['error' => $e->getMessage()]);
             $this->stats = ['critical_errors' => 0, 'warnings' => 0, 'info' => 0, 'total' => 0, 'resolved' => 0];
+            $this->logs = [];
         }
         
         \Log::info('Livewire: Page mount completed', [
@@ -447,12 +449,12 @@ class LuaErrorLogger extends Page
             'last_check_time' => $this->lastConsoleCheck
         ]);
         
-        // Surveiller la console pour de nouvelles erreurs (depuis la dernière vérification)
-        $this->monitorConsole();
-        $this->dispatch('logs-refreshed');
+        // Mettre à jour les logs
+        $this->logs = $this->getLogs();
         
         \Log::info('Livewire: refreshLogs completed', [
-            'server_id' => $this->getServer()->id
+            'server_id' => $this->getServer()->id,
+            'logs_count' => count($this->logs)
         ]);
     }
 
