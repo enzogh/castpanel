@@ -13,67 +13,7 @@
 
 
 
-        <!-- Filtres et recherche -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700">
-            <div class="flex flex-col sm:flex-row gap-4">
-                <div class="flex-1">
-                    <label for="search" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Rechercher dans les logs
-                    </label>
-                    <input
-                        type="text"
-                        wire:model.live="search"
-                        placeholder="Rechercher une erreur, un addon, etc..."
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                    >
-                </div>
-                <div class="sm:w-48">
-                    <label for="level-filter" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Niveau
-                    </label>
-                    <select
-                        wire:model.live="levelFilter"
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                    >
-                        <option value="">Tous les niveaux</option>
-                        <option value="error">Erreurs</option>
-                        <option value="warning">Avertissements</option>
-                        <option value="info">Informations</option>
-                    </select>
-                </div>
-                <div class="sm:w-48">
-                    <label for="time-filter" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Période
-                    </label>
-                    <select
-                        wire:model.live="timeFilter"
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                    >
-                        <option value="1h">Dernière heure</option>
-                        <option value="24h">Dernières 24h</option>
-                        <option value="7d">7 derniers jours</option>
-                        <option value="30d">30 derniers jours</option>
-                        <option value="all">Tout</option>
-                    </select>
-                </div>
-                <div class="sm:w-48">
-                    <label for="show-resolved" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Afficher les résolues
-                    </label>
-                    <div class="flex items-center">
-                        <input
-                            type="checkbox"
-                            wire:model.live="showResolved"
-                            id="show-resolved"
-                            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded dark:border-gray-600 dark:bg-gray-700"
-                        >
-                        <label for="show-resolved" class="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                            {{ $showResolved ? 'Oui' : 'Non' }}
-                        </label>
-                    </div>
-                </div>
-            </div>
-        </div>
+
 
         <!-- Logs en temps réel -->
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
