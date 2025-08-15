@@ -380,6 +380,26 @@ class LuaErrorLogger extends Page
         ]);
     }
 
+    /**
+     * Rafraîchit les données pour forcer la mise à jour de l'interface
+     */
+    public function refreshData(): void
+    {
+        \Log::info('Livewire: refreshData called', [
+            'server_id' => $this->getServer()->id
+        ]);
+        
+        // Forcer la mise à jour des propriétés
+        $this->logs = $this->getLogs();
+        $this->stats = $this->getStats();
+        
+        \Log::info('Livewire: refreshData completed', [
+            'server_id' => $this->getServer()->id,
+            'logs_count' => count($this->logs),
+            'stats' => $this->stats
+        ]);
+    }
+
     public function monitorConsole(): void
     {
         \Log::info('Livewire: monitorConsole called', [
@@ -556,6 +576,9 @@ class LuaErrorLogger extends Page
             
             // Forcer la mise à jour de l'interface
             $this->dispatch('error-resolved', ['error_key' => $errorKey]);
+            
+            // Rafraîchir les données immédiatement
+            $this->refreshData();
         } else {
             // L'erreur n'est pas dans consoleErrors, essayer de la marquer comme résolue dans les logs stockés
             \Log::info('Livewire: Error not in consoleErrors, trying to mark as resolved in stored logs', [
@@ -574,6 +597,9 @@ class LuaErrorLogger extends Page
                 
                 // Forcer la mise à jour de l'interface
                 $this->dispatch('error-resolved', ['error_key' => $errorKey]);
+                
+                // Rafraîchir les données immédiatement
+                $this->refreshData();
             } else {
                 \Log::warning('Livewire: Failed to mark error as resolved in stored logs', [
                     'server_id' => $this->getServer()->id,
@@ -606,6 +632,9 @@ class LuaErrorLogger extends Page
             
             // Forcer la mise à jour de l'interface
             $this->dispatch('error-unresolved', ['error_key' => $errorKey]);
+            
+            // Rafraîchir les données immédiatement
+            $this->refreshData();
         } else {
             // L'erreur n'est pas dans consoleErrors, essayer de la marquer comme non résolue dans les logs stockés
             \Log::info('Livewire: Error not in consoleErrors, trying to mark as unresolved in stored logs', [
@@ -624,6 +653,9 @@ class LuaErrorLogger extends Page
                 
                 // Forcer la mise à jour de l'interface
                 $this->dispatch('error-unresolved', ['error_key' => $errorKey]);
+                
+                // Rafraîchir les données immédiatement
+                $this->refreshData();
             } else {
                 \Log::warning('Livewire: Failed to mark error as unresolved in stored logs', [
                     'server_id' => $this->getServer()->id,
@@ -657,6 +689,9 @@ class LuaErrorLogger extends Page
             
             // Forcer la mise à jour de l'interface
             $this->dispatch('error-deleted', ['error_key' => $errorKey]);
+            
+            // Rafraîchir les données immédiatement
+            $this->refreshData();
         } else {
             // L'erreur n'est pas dans consoleErrors, essayer de la supprimer des logs stockés
             \Log::info('Livewire: Error not in consoleErrors, trying to delete from stored logs', [
@@ -675,6 +710,9 @@ class LuaErrorLogger extends Page
                 
                 // Forcer la mise à jour de l'interface
                 $this->dispatch('error-deleted', ['error_key' => $errorKey]);
+                
+                // Rafraîchir les données immédiatement
+                $this->refreshData();
             } else {
                 \Log::warning('Livewire: Failed to delete error from stored logs', [
                     'server_id' => $this->getServer()->id,
