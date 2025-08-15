@@ -262,7 +262,7 @@
                             <!-- Corps du tableau -->
                             <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
                                 @foreach($logs as $log)
-                                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors {{ $log['resolved'] ?? false ? 'opacity-60 bg-green-50 dark:bg-green-900/20' : '' }}">
+                                    <tr class="hover:scale-[1.01] hover:shadow-sm transition-all duration-200 {{ $log['resolved'] ?? false ? 'opacity-60 bg-green-50 dark:bg-green-900/20' : '' }}">
                                         <!-- Première fois -->
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                                             <div class="flex flex-col">
