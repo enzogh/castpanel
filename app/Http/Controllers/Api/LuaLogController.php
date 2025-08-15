@@ -16,6 +16,44 @@ class LuaLogController extends Controller
     ) {}
 
     /**
+     * Surveille la console en temps réel pour les erreurs Lua
+     */
+    public function monitorConsole(Request $request, Server $server): JsonResponse
+    {
+        // Vérifier les permissions
+        if (!Auth::user()->can('view server', $server)) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        // Vérifier que c'est un serveur Garry's Mod
+        if (!$server->egg || $server->egg->name !== 'Garrys Mod') {
+            return response()->json(['error' => 'This endpoint is only available for Garry\'s Mod servers'], 400);
+        }
+
+        $newErrors = $this->luaLogService->monitorConsole($server);
+        
+        // Sauvegarder les nouvelles erreurs
+        foreach ($newErrors as $error) {
+            $this->luaLogService->addLog(
+                $server,
+                $error['level'],
+                $error['message'],
+                $error['addon'],
+                $error['stack_trace']
+            );
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'new_errors' => $newErrors,
+                'total_new' => count($newErrors),
+                'timestamp' => now()->toISOString(),
+            ]
+        ]);
+    }
+
+    /**
      * Récupère les logs Lua d'un serveur
      */
     public function getLogs(Request $request, Server $server): JsonResponse

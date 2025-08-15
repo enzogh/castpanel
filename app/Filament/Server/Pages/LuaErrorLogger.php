@@ -21,13 +21,14 @@ class LuaErrorLogger extends Page
 
     protected static string $view = 'filament.server.pages.lua-error-logger';
 
-    protected static ?string $pollingInterval = '10s';
+    protected static ?string $pollingInterval = '5s';
 
     public $search = '';
     public $levelFilter = '';
     public $timeFilter = '24h';
     public $logsPaused = false;
     public $autoScroll = true;
+    public $consoleErrors = [];
 
     protected LuaLogService $luaLogService;
 
@@ -80,7 +81,17 @@ class LuaErrorLogger extends Page
             'time' => $this->timeFilter,
         ];
 
-        return $this->luaLogService->getLogs($this->getServer(), $filters);
+        $storedLogs = $this->luaLogService->getLogs($this->getServer(), $filters);
+        
+        // Combiner avec les erreurs de console en temps réel
+        $allLogs = array_merge($storedLogs, $this->consoleErrors);
+        
+        // Trier par timestamp (plus récent en premier)
+        usort($allLogs, function($a, $b) {
+            return strtotime($b['timestamp']) - strtotime($a['timestamp']);
+        });
+        
+        return $allLogs;
     }
 
     #[Computed]
@@ -103,7 +114,46 @@ class LuaErrorLogger extends Page
 
     public function refreshLogs(): void
     {
+        // Surveiller la console pour de nouvelles erreurs
+        $this->monitorConsole();
         $this->dispatch('logs-refreshed');
+    }
+
+    public function monitorConsole(): void
+    {
+        if (!$this->logsPaused) {
+            $newErrors = $this->luaLogService->monitorConsole($this->getServer());
+            
+            foreach ($newErrors as $error) {
+                // Vérifier si l'erreur n'existe pas déjà
+                $exists = false;
+                foreach ($this->consoleErrors as $existingError) {
+                    if ($existingError['message'] === $error['message'] && 
+                        $existingError['timestamp'] === $error['timestamp']) {
+                        $exists = true;
+                        break;
+                    }
+                }
+                
+                if (!$exists) {
+                    $this->consoleErrors[] = $error;
+                    
+                    // Sauvegarder l'erreur dans le fichier de log
+                    $this->luaLogService->addLog(
+                        $this->getServer(),
+                        $error['level'],
+                        $error['message'],
+                        $error['addon'],
+                        $error['stack_trace']
+                    );
+                }
+            }
+            
+            // Limiter le nombre d'erreurs en mémoire
+            if (count($this->consoleErrors) > 100) {
+                $this->consoleErrors = array_slice($this->consoleErrors, -100);
+            }
+        }
     }
 
     public function clearLogs(): void

@@ -6,9 +6,206 @@ use App\Models\Server;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Http;
 
 class LuaLogService
 {
+    /**
+     * Surveille la console en temps réel et capture les erreurs Lua
+     */
+    public function monitorConsole(Server $server): array
+    {
+        if (!$this->isGarrysModServer($server)) {
+            return [];
+        }
+
+        try {
+            // Récupérer les logs de la console via l'API du daemon
+            $response = Http::timeout(10)->get($this->getDaemonUrl($server) . '/api/servers/' . $server->uuid . '/logs');
+            
+            if ($response->successful()) {
+                $consoleOutput = $response->body();
+                return $this->parseConsoleForLuaErrors($consoleOutput);
+            }
+        } catch (\Exception $e) {
+            Log::channel('lua')->error('Failed to monitor console', [
+                'server_id' => $server->id,
+                'error' => $e->getMessage()
+            ]);
+        }
+
+        return [];
+    }
+
+    /**
+     * Parse la sortie console pour détecter les erreurs Lua
+     */
+    private function parseConsoleForLuaErrors(string $consoleOutput): array
+    {
+        $errors = [];
+        $lines = explode("\n", $consoleOutput);
+        
+        foreach ($lines as $lineNumber => $line) {
+            $line = trim($line);
+            
+            // Détecter les erreurs Lua
+            if ($this->isLuaError($line)) {
+                $error = $this->extractLuaError($line, $lines, $lineNumber);
+                if ($error) {
+                    $errors[] = $error;
+                }
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
+     * Vérifie si une ligne contient une erreur Lua
+     */
+    private function isLuaError(string $line): bool
+    {
+        $luaErrorPatterns = [
+            '/^\[ERROR\]/i',
+            '/lua_run:\d+:/',
+            '/attempt to call global/',
+            '/attempt to index/',
+            '/bad argument/',
+            '/syntax error/',
+            '/nil value/',
+            '/missing dependency/',
+            '/failed to load/',
+            '/error in addon/',
+        ];
+
+        foreach ($luaErrorPatterns as $pattern) {
+            if (preg_match($pattern, $line)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Extrait les détails d'une erreur Lua
+     */
+    private function extractLuaError(string $errorLine, array $allLines, int $lineNumber): ?array
+    {
+        $error = [
+            'timestamp' => now()->toISOString(),
+            'level' => 'error',
+            'message' => $errorLine,
+            'addon' => $this->extractAddonName($errorLine),
+            'stack_trace' => $this->extractStackTrace($allLines, $lineNumber),
+            'line_number' => $lineNumber + 1,
+            'error_type' => $this->categorizeLuaError($errorLine),
+        ];
+
+        return $error;
+    }
+
+    /**
+     * Extrait le nom de l'addon depuis l'erreur
+     */
+    private function extractAddonName(string $errorLine): ?string
+    {
+        // Patterns pour détecter le nom de l'addon
+        $patterns = [
+            '/addon[:\s]+([^\s,]+)/i',
+            '/lua_run:(\d+):/',
+            '/in addon[:\s]+([^\s,]+)/i',
+            '/addon\s+([^\s,]+)/i',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $errorLine, $matches)) {
+                return $matches[1] ?? 'Unknown';
+            }
+        }
+
+        // Si pas de nom d'addon trouvé, essayer de l'extraire du contexte
+        if (strpos($errorLine, 'lua_run:') !== false) {
+            return 'Console Command';
+        }
+
+        return 'Unknown Addon';
+    }
+
+    /**
+     * Extrait la stack trace depuis les lignes suivantes
+     */
+    private function extractStackTrace(array $allLines, int $errorLineNumber): string
+    {
+        $stackTrace = [];
+        $maxLines = 10; // Limiter le nombre de lignes pour la stack trace
+        
+        // Prendre quelques lignes avant l'erreur pour le contexte
+        $startLine = max(0, $errorLineNumber - 2);
+        $endLine = min(count($allLines) - 1, $errorLineNumber + $maxLines);
+        
+        for ($i = $startLine; $i <= $endLine; $i++) {
+            $line = trim($allLines[$i]);
+            if (!empty($line)) {
+                $prefix = ($i === $errorLineNumber) ? '>>> ' : '    ';
+                $stackTrace[] = $prefix . $line;
+            }
+        }
+
+        return implode("\n", $stackTrace);
+    }
+
+    /**
+     * Catégorise le type d'erreur Lua
+     */
+    private function categorizeLuaError(string $errorLine): string
+    {
+        $errorLine = strtolower($errorLine);
+        
+        if (strpos($errorLine, 'attempt to call global') !== false) {
+            return 'Call nil value';
+        }
+        
+        if (strpos($errorLine, 'attempt to index') !== false) {
+            return 'Index nil value';
+        }
+        
+        if (strpos($errorLine, 'bad argument') !== false) {
+            return 'Bad argument';
+        }
+        
+        if (strpos($errorLine, 'syntax error') !== false) {
+            return 'Syntax error';
+        }
+        
+        if (strpos($errorLine, 'nil value') !== false) {
+            return 'Nil value error';
+        }
+        
+        if (strpos($errorLine, 'missing dependency') !== false) {
+            return 'Missing dependency';
+        }
+        
+        if (strpos($errorLine, 'failed to load') !== false) {
+            return 'Load failure';
+        }
+        
+        return 'Other error';
+    }
+
+    /**
+     * Récupère l'URL du daemon pour le serveur
+     */
+    private function getDaemonUrl(Server $server): string
+    {
+        $node = $server->node;
+        $scheme = $node->scheme ?? 'http';
+        $host = $node->fqdn ?? $node->ip;
+        $port = $node->daemon_listen ?? 8080;
+        
+        return "{$scheme}://{$host}:{$port}";
+    }
+
     /**
      * Récupère les logs Lua d'un serveur
      */

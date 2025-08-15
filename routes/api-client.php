@@ -143,5 +143,6 @@ Route::prefix('/servers/{server:uuid}')->middleware([ServerSubject::class, Authe
         Route::get('/stats', [App\Http\Controllers\Api\LuaLogController::class, 'getStats']);
         Route::get('/top-addons', [App\Http\Controllers\Api\LuaLogController::class, 'getTopAddonErrors']);
         Route::get('/top-errors', [App\Http\Controllers\Api\LuaLogController::class, 'getTopErrorTypes']);
+        Route::get('/monitor', [App\Http\Controllers\Api\LuaLogController::class, 'monitorConsole']);
     });
 });

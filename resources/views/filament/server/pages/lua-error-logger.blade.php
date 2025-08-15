@@ -109,9 +109,22 @@
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
             <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
                 <div class="flex items-center justify-between">
-                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">
-                        Logs en temps réel
-                    </h3>
+                    <div class="flex items-center space-x-3">
+                        <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+                            Logs en temps réel
+                        </h3>
+                        @if(!$logsPaused)
+                            <div class="flex items-center space-x-2">
+                                <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                                <span class="text-sm text-green-600 dark:text-green-400">Surveillance active</span>
+                            </div>
+                        @else
+                            <div class="flex items-center space-x-2">
+                                <div class="w-2 h-2 bg-red-500 rounded-full"></div>
+                                <span class="text-sm text-red-600 dark:text-red-400">Surveillance en pause</span>
+                            </div>
+                        @endif
+                    </div>
                     <div class="flex items-center space-x-2">
                         <button
                             wire:click="toggleAutoScroll"
@@ -127,7 +140,7 @@
                             class="px-3 py-1 text-sm rounded-md transition-colors {{ $logsPaused ? 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300' }}"
                         >
                             <svg class="w-4 h-4 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $logsPaused ? 'M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' : 'M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z' }}"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $logsPaused ? 'M14.828 14.828a4 0 01-5.656 0M9 10h1m4 0h1m-6 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' : 'M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z' }}"></path>
                             </svg>
                             {{ $logsPaused ? 'Reprendre' : 'Pause' }}
                         </button>
@@ -150,7 +163,18 @@
                             <div class="log-entry mb-2 p-2 rounded border-l-4 
                                 {{ $log['level'] === 'error' ? 'border-red-500 bg-red-50 dark:bg-red-900/20' : 
                                    ($log['level'] === 'warning' ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20' : 
-                                    'border-blue-500 bg-blue-50 dark:bg-blue-900/20') }}">
+                                    'border-blue-500 bg-blue-50 dark:bg-blue-900/20') }}
+                                {{ in_array($log, $consoleErrors) ? 'ring-2 ring-blue-300 dark:ring-blue-600' : '' }}">
+                                @if(in_array($log, $consoleErrors))
+                                    <div class="flex items-center justify-between mb-1">
+                                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                            </svg>
+                                            Nouvelle erreur détectée
+                                        </span>
+                                    </div>
+                                @endif
                                 <div class="flex items-start space-x-2">
                                     <div class="flex-shrink-0">
                                         <span class="text-xs text-gray-500 dark:text-gray-400">
