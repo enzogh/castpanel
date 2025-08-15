@@ -48,6 +48,12 @@
                         >
                             Actualiser
                         </button>
+                        <button
+                            wire:click="toggleShowResolved"
+                            class="px-3 py-1 text-sm rounded-md transition-colors {{ $showResolved ? 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300' : 'bg-gray-100 dark:bg-gray-900/20 text-gray-700 dark:text-gray-300' }}"
+                        >
+                            {{ $showResolved ? 'Masquer résolues' : 'Afficher résolues' }}
+                        </button>
                     </div>
                 </div>
             </div>
@@ -56,20 +62,20 @@
             <div class="p-4">
                 <div class="overflow-x-auto">
                     @if(count($logs) > 0)
-                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <table class="w-full divide-y divide-gray-200 dark:divide-gray-700">
                             <!-- En-tête du tableau -->
                             <thead class="bg-gray-50 dark:bg-gray-800">
                                 <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-32">
                                         Première fois
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-32">
                                         Dernière fois
                                     </th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                         Message d'erreur
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-48">
                                         Actions
                                     </th>
                                 </tr>
@@ -80,7 +86,7 @@
                                 @foreach($logs as $log)
                                     <tr class="hover:scale-[1.01] hover:shadow-sm transition-all duration-200 {{ $log['resolved'] ?? false ? 'opacity-60 bg-green-50 dark:bg-green-900/20' : '' }}">
                                         <!-- Première fois -->
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white w-32">
                                             <div class="flex flex-col">
                                                 <span class="font-medium">{{ \Carbon\Carbon::parse($log['first_seen'] ?? $log['timestamp'])->format('H:i:s') }}</span>
                                                 @if(isset($log['count']) && $log['count'] > 1)
@@ -90,7 +96,7 @@
                                         </td>
                                         
                                         <!-- Dernière fois -->
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white w-32">
                                             <div class="flex flex-col">
                                                 <span class="font-medium">{{ \Carbon\Carbon::parse($log['last_seen'] ?? $log['timestamp'])->format('H:i:s') }}</span>
                                                 @if($log['resolved'] ?? false)
@@ -100,8 +106,8 @@
                                         </td>
                                         
                                         <!-- Message d'erreur -->
-                                        <td class="px-6 py-4">
-                                            <div class="max-w-md">
+                                        <td class="px-6 py-4 min-w-0">
+                                            <div class="min-w-0">
                                                 <p class="text-sm text-gray-900 dark:text-white font-mono break-words">
                                                     {{ Str::limit($log['message'], 80) }}
                                                 </p>
@@ -117,7 +123,7 @@
                                         </td>
                                         
                                         <!-- Actions -->
-                                        <td class="px-6 py-4 whitespace-nowrap">
+                                        <td class="px-6 py-4 whitespace-nowrap w-48">
                                             <div class="flex items-center space-x-2">
                                                 @if($log['resolved'] ?? false)
                                                     <button

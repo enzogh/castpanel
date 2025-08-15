@@ -437,6 +437,19 @@ class LuaErrorLogger extends Page
         }
     }
 
+    public function toggleShowResolved(): void
+    {
+        $this->showResolved = !$this->showResolved;
+        
+        \Log::info('Livewire: toggleShowResolved called', [
+            'server_id' => $this->getServer()->id,
+            'show_resolved' => $this->showResolved
+        ]);
+
+        // Actualiser les logs avec le nouveau filtre
+        $this->logs = $this->getLogs();
+    }
+
     public function monitorConsole(): void
     {
         \Log::info('Livewire: monitorConsole called', [
