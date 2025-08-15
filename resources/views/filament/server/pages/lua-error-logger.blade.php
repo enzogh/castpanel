@@ -8,7 +8,7 @@
                     <div class="flex items-center space-x-3">
                         <div class="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
                             <svg class="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2z"></path>
                             </svg>
                         </div>
                         <div>
@@ -233,148 +233,160 @@
                 </div>
             </div>
 
-            <!-- Liste des logs -->
+            <!-- Tableau des logs -->
             <div class="p-4">
-                <div class="max-h-96 overflow-y-auto">
+                <div class="overflow-x-auto">
                     @if(count($logs) > 0)
-                        <div class="divide-y divide-gray-200 dark:divide-gray-700">
-                            @foreach($logs as $log)
-                                <div class="p-4 hover:bg-gray-700/50 dark:hover:bg-gray-600/50 transition-colors {{ isset($log['count']) ? 'ring-2 ring-blue-300 dark:ring-blue-600' : '' }} {{ $log['resolved'] ?? false ? 'opacity-60 bg-green-50 dark:bg-green-900/20' : '' }}">
-                                    <div class="flex items-center justify-between mb-1">
-                                        @if(isset($log['count']) && $log['count'] > 1)
-                                            <span class="text-xs text-gray-500 dark:text-gray-400">
-                                                Première fois: {{ \Carbon\Carbon::parse($log['first_seen'])->format('H:i:s') }}
-                                            </span>
-                                        @else
-                                            <span></span>
-                                        @endif
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                            <!-- En-tête du tableau -->
+                            <thead class="bg-gray-50 dark:bg-gray-800">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        Statut
+                                    </th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        Première fois
+                                    </th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        Dernière fois
+                                    </th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        Compteur
+                                    </th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        Message d'erreur
+                                    </th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        Addon
+                                    </th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        Actions
+                                    </th>
+                                </tr>
+                            </thead>
+                            
+                            <!-- Corps du tableau -->
+                            <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                                @foreach($logs as $log)
+                                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors {{ $log['resolved'] ?? false ? 'opacity-60 bg-green-50 dark:bg-green-900/20' : '' }}">
+                                        <!-- Statut -->
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            @if($log['resolved'] ?? false)
+                                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                                    </svg>
+                                                    Résolu
+                                                </span>
+                                            @else
+                                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium {{ $log['level'] === 'error' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' : ($log['level'] === 'warning' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200') }}">
+                                                    {{ ucfirst($log['level'] ?? 'info') }}
+                                                </span>
+                                            @endif
+                                        </td>
                                         
-                                        <!-- Barre d'actions pour chaque erreur -->
-                                        <div class="flex items-center justify-between bg-gray-50 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
-                                            <!-- Informations de l'erreur -->
-                                            <div class="flex items-center space-x-2">
-                                                @if($log['resolved'] ?? false)
-                                                    <span class="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border border-green-200 dark:border-green-700">
-                                                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                                                        </svg>
-                                                        Résolu
-                                                    </span>
+                                        <!-- Première fois -->
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                            {{ \Carbon\Carbon::parse($log['first_seen'] ?? $log['timestamp'])->format('H:i:s') }}
+                                        </td>
+                                        
+                                        <!-- Dernière fois -->
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                            {{ \Carbon\Carbon::parse($log['last_seen'] ?? $log['timestamp'])->format('H:i:s') }}
+                                        </td>
+                                        
+                                        <!-- Compteur -->
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            @if(isset($log['count']) && $log['count'] > 1)
+                                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
+                                                    {{ $log['count'] }}x
+                                                </span>
+                                            @else
+                                                <span class="text-sm text-gray-500 dark:text-gray-400">-</span>
+                                            @endif
+                                        </td>
+                                        
+                                        <!-- Message d'erreur -->
+                                        <td class="px-6 py-4">
+                                            <div class="max-w-md">
+                                                <p class="text-sm text-gray-900 dark:text-white font-mono break-words">
+                                                    {{ Str::limit($log['message'], 80) }}
+                                                </p>
+                                                @if(isset($log['stack_trace']) && !empty($log['stack_trace']))
+                                                    <details class="mt-2">
+                                                        <summary class="text-xs text-gray-500 dark:text-gray-400 cursor-pointer hover:text-gray-700 dark:hover:text-gray-300">
+                                                            Voir la stack trace
+                                                        </summary>
+                                                        <pre class="mt-2 text-xs text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 p-2 rounded border overflow-x-auto">{{ $log['stack_trace'] }}</pre>
+                                                    </details>
                                                 @endif
                                             </div>
-
-                                            <!-- Boutons d'action -->
+                                        </td>
+                                        
+                                        <!-- Addon -->
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            @if(isset($log['addon']) && $log['addon'] !== 'unknown')
+                                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                                                    {{ $log['addon'] }}
+                                                </span>
+                                            @else
+                                                <span class="text-sm text-gray-500 dark:text-gray-400">-</span>
+                                            @endif
+                                        </td>
+                                        
+                                        <!-- Actions -->
+                                        <td class="px-6 py-4 whitespace-nowrap">
                                             <div class="flex items-center space-x-2">
                                                 @if($log['resolved'] ?? false)
-                                                    <!-- Actions pour erreur résolue -->
                                                     <button
                                                         wire:click="markAsUnresolved('{{ $log['error_key'] }}')"
                                                         wire:loading.attr="disabled"
                                                         wire:loading.class="opacity-50 cursor-not-allowed"
-                                                        class="inline-flex items-center px-4 py-2 rounded-md text-sm font-medium bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 border border-yellow-200 dark:border-yellow-700 hover:bg-yellow-200 dark:hover:bg-yellow-800 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        class="inline-flex items-center px-3 py-1 rounded text-xs font-medium bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 hover:bg-yellow-200 dark:hover:bg-yellow-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                                         title="Marquer comme non résolu"
                                                     >
-                                                        <svg wire:loading.remove class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <svg wire:loading.remove class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                                                         </svg>
-                                                        <svg wire:loading class="w-4 h-4 mr-1 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <svg wire:loading class="w-3 h-3 mr-1 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                                                         </svg>
                                                         Réouvrir
                                                     </button>
                                                 @else
-                                                    <!-- Actions pour erreur non résolue -->
                                                     <button
                                                         wire:click="markAsResolved('{{ $log['error_key'] }}')"
                                                         wire:loading.attr="disabled"
                                                         wire:loading.class="opacity-50 cursor-not-allowed"
-                                                        class="inline-flex items-center px-4 py-2 rounded-md text-sm font-medium bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700 text-white border border-green-600 dark:border-green-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        class="inline-flex items-center px-3 py-1 rounded text-xs font-medium bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                                         title="Marquer cette erreur comme résolue"
                                                     >
-                                                        <svg wire:loading.remove class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <svg wire:loading.remove class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                                                         </svg>
-                                                        <svg wire:loading class="w-4 h-4 mr-1 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <svg wire:loading class="w-3 h-3 mr-1 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                                                         </svg>
                                                         Résoudre
                                                     </button>
                                                 @endif
 
-                                                <!-- Bouton de suppression -->
                                                 <button
                                                     wire:click="deleteError('{{ $log['error_key'] }}')"
-                                                    class="inline-flex items-center px-4 py-2 rounded-md text-sm font-medium bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700 text-white border border-red-600 dark:border-green-700 transition-all duration-200"
+                                                    class="inline-flex items-center px-3 py-1 rounded text-xs font-medium bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700 text-white transition-colors"
                                                     title="Supprimer cette erreur"
                                                 >
-                                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                                                     </svg>
                                                     Supprimer
                                                 </button>
                                             </div>
-                                        </div>
-                                    </div>
-                                    <div class="flex items-start space-x-3">
-                                        <!-- Timestamps -->
-                                        <div class="flex-shrink-0 flex flex-col items-center space-y-1">
-                                            <div class="text-center">
-                                                <span class="text-xs text-gray-500 dark:text-gray-400 font-medium">
-                                                    Dernière
-                                                </span>
-                                                <div class="text-sm font-semibold text-gray-900 dark:text-white">
-                                                    {{ \Carbon\Carbon::parse($log['last_seen'] ?? $log['timestamp'])->format('H:i:s') }}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="flex-1 min-w-0">
-                                            <!-- En-tête avec badges et informations -->
-                                            <div class="flex items-center space-x-2 mb-3">
-                                                @if(isset($log['count']) && $log['count'] > 1)
-                                                    <span class="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 border border-orange-200 dark:border-orange-700">
-                                                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                                                        </svg>
-                                                        Erreur répétée ({{ $log['count'] }}x)
-                                                    </span>
-                                                @else
-                                                    <span class="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium {{ $log['level'] === 'error' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 border border-red-200 dark:border-red-700' : ($log['level'] === 'warning' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 border border-yellow-200 dark:border-yellow-700' : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border border-blue-200 dark:border-blue-700') }}">
-                                                        {{ ucfirst($log['level'] ?? 'info') }}
-                                                    </span>
-                                                @endif
-                                                
-                                                @if(isset($log['addon']) && $log['addon'] !== 'unknown')
-                                                    <span class="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-600">
-                                                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2H5a2 2 0 00-2 2v2m14 0V7a2 2 0 00-2-2H5a2 2 0 00-2 2v2"></path>
-                                                        </svg>
-                                                        {{ $log['addon'] }}
-                                                    </span>
-                                                @endif
-                                            </div>
-                                            <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
-                                                <p class="text-sm text-gray-900 dark:text-white font-mono break-all leading-relaxed">
-                                                    {{ $log['message'] }}
-                                                </p>
-                                            </div>
-                                            @if(isset($log['stack_trace']) && !empty($log['stack_trace']))
-                                                <details class="mt-3">
-                                                    <summary class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 cursor-pointer hover:text-gray-800 dark:hover:text-gray-200 bg-gray-100 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
-                                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                                                        </svg>
-                                                        Voir la stack trace
-                                                    </summary>
-                                                    <div class="mt-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-                                                        <pre class="text-xs text-gray-600 dark:text-gray-400 p-4 overflow-x-auto leading-relaxed">{{ $log['stack_trace'] }}</pre>
-                                                    </div>
-                                                </details>
-                                            @endif
-                                        </div>
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
                     @else
                         <div class="p-8 text-center">
                             <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
