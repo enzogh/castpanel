@@ -414,8 +414,8 @@ class LuaLogService
         }
 
         try {
-            // Essayer d'abord la base de données
-            $query = LuaError::forServer($server->id);
+            // Récupérer seulement les erreurs visibles (non supprimées)
+            $query = LuaError::forServer($server->id)->visible();
 
             // Appliquer les filtres
             if (isset($filters['resolved'])) {
@@ -440,7 +440,7 @@ class LuaLogService
 
             $logs = $query->orderBy('last_seen', 'desc')->get();
 
-            \Log::channel('lua')->info('Logs retrieved from database', [
+            \Log::channel('lua')->info('Visible logs retrieved from database', [
                 'server_id' => $server->id,
                 'logs_count' => $logs->count(),
                 'filters' => $filters
@@ -457,6 +457,7 @@ class LuaLogService
                     'count' => $log->count,
                     'first_seen' => $log->first_seen,
                     'last_seen' => $log->last_seen,
+                    'status' => $log->status,
                     'resolved' => $log->resolved,
                     'resolved_at' => $log->resolved_at,
                     'server_id' => $log->server_id,
@@ -500,32 +501,51 @@ class LuaLogService
         }
 
         try {
-            // Essayer d'abord la base de données
+            // Créer un hash unique pour cette erreur
             $errorKey = md5($message . '|' . ($addon ?? 'unknown'));
 
-            // Créer ou mettre à jour l'erreur
-            $luaError = LuaError::createOrUpdate(
-                $server->id,
-                $errorKey,
-                $message,
-                $addon,
-                $stackTrace,
-                $level
-            );
+            // Vérifier si l'erreur existe déjà et n'est pas supprimée
+            $existingError = LuaError::where('error_key', $errorKey)
+                ->where('server_id', $server->id)
+                ->whereNull('deleted_at')
+                ->first();
 
-            // Si l'erreur existe déjà et n'est pas résolue, incrémenter le compteur
-            if ($luaError->wasRecentlyCreated === false && !$luaError->resolved) {
-                $luaError->incrementCount();
+            if ($existingError) {
+                // L'erreur existe déjà, incrémenter le compteur et mettre à jour last_seen
+                $existingError->incrementCount();
+                $existingError->update(['last_seen' => now()]);
+
+                Log::channel('lua')->info('Lua error count incremented', [
+                    'server_id' => $server->id,
+                    'error_key' => $errorKey,
+                    'message' => $message,
+                    'addon' => $addon,
+                    'new_count' => $existingError->count,
+                ]);
+                return; // Ne pas créer de doublon
             }
 
-            // Logger aussi dans Laravel pour le debugging
-            Log::channel('lua')->info('Lua log added to database', [
+            // Nouvelle erreur, la créer
+            $luaError = LuaError::create([
+                'server_id' => $server->id,
+                'error_key' => $errorKey,
+                'level' => $level,
+                'message' => $message,
+                'addon' => $addon,
+                'stack_trace' => $stackTrace,
+                'first_seen' => now(),
+                'last_seen' => now(),
+                'count' => 1,
+                'status' => 'open',
+                'resolved' => false,
+            ]);
+
+            Log::channel('lua')->info('New Lua error created in database', [
                 'server_id' => $server->id,
                 'error_key' => $errorKey,
                 'message' => $message,
                 'addon' => $addon,
-                'count' => $luaError->count,
-                'resolved' => $luaError->resolved,
+                'count' => 1,
             ]);
 
         } catch (\Exception $e) {
@@ -1023,38 +1043,37 @@ class LuaLogService
     }
 
     /**
-     * Supprime un log de la base de données
+     * Masque un log (suppression soft) au lieu de le supprimer physiquement
      */
     public function deleteLog(Server $server, string $errorKey): bool
     {
         try {
             $luaError = LuaError::where('error_key', $errorKey)
                 ->where('server_id', $server->id)
+                ->whereNull('deleted_at') // Seulement les erreurs non supprimées
                 ->first();
 
             if (!$luaError) {
-                Log::channel('lua')->warning('Log not found for deletion', [
+                Log::channel('lua')->warning('Log not found for soft deletion', [
                     'server_id' => $server->id,
                     'error_key' => $errorKey
                 ]);
                 return false;
             }
 
-            $deleted = $luaError->delete();
+            // Masquer l'erreur au lieu de la supprimer
+            $luaError->softDelete();
 
-            if ($deleted) {
-                Log::channel('lua')->info('Log deleted from database', [
-                    'server_id' => $server->id,
-                    'error_key' => $errorKey,
-                    'message' => $luaError->message
-                ]);
-                return true;
-            }
-
-            return false;
+            Log::channel('lua')->info('Log soft deleted (hidden from view)', [
+                'server_id' => $server->id,
+                'error_key' => $errorKey,
+                'message' => $luaError->message,
+                'deleted_at' => $luaError->deleted_at
+            ]);
+            return true;
 
         } catch (\Exception $e) {
-            Log::channel('lua')->error('Error deleting log', [
+            Log::channel('lua')->error('Error soft deleting log', [
                 'server_id' => $server->id,
                 'error_key' => $errorKey,
                 'error' => $e->getMessage()

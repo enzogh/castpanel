@@ -26,6 +26,7 @@ class LuaError extends Model
         'resolved_at',
         'closed_at',
         'resolution_notes',
+        'deleted_at',
     ];
 
     protected $casts = [
@@ -35,6 +36,7 @@ class LuaError extends Model
         'last_seen' => 'datetime',
         'resolved_at' => 'datetime',
         'closed_at' => 'datetime',
+        'deleted_at' => 'datetime',
         'count' => 'integer',
     ];
 
@@ -81,6 +83,22 @@ class LuaError extends Model
     public function scopeClosed($query)
     {
         return $query->where('status', self::STATUS_CLOSED);
+    }
+
+    /**
+     * Scope pour les erreurs non supprimées (visibles)
+     */
+    public function scopeVisible($query)
+    {
+        return $query->whereNull('deleted_at');
+    }
+
+    /**
+     * Scope pour les erreurs supprimées (masquées)
+     */
+    public function scopeDeleted($query)
+    {
+        return $query->whereNotNull('deleted_at');
     }
 
     /**
@@ -139,6 +157,26 @@ class LuaError extends Model
             'resolved_at' => null,
             'closed_at' => null,
             'resolution_notes' => null,
+        ]);
+    }
+
+    /**
+     * Masquer une erreur (suppression soft)
+     */
+    public function softDelete(): void
+    {
+        $this->update([
+            'deleted_at' => now(),
+        ]);
+    }
+
+    /**
+     * Restaurer une erreur masquée
+     */
+    public function restore(): void
+    {
+        $this->update([
+            'deleted_at' => null,
         ]);
     }
 
