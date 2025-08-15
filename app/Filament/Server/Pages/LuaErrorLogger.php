@@ -54,6 +54,12 @@ class LuaErrorLogger extends Page
         
         // Démarrer immédiatement la surveillance
         $this->startMonitoring();
+        
+        \Log::channel('lua')->info('Livewire: Page mount completed', [
+            'server_id' => $this->getServer()->id,
+            'console_errors_count' => count($this->consoleErrors),
+            'stats' => $this->getStats()
+        ]);
     }
 
     public function startMonitoring(): void
@@ -181,7 +187,52 @@ class LuaErrorLogger extends Page
     #[Computed]
     public function getStats(): array
     {
-        return $this->getLuaLogService()->getLogStats($this->getServer());
+        // Récupérer les stats des logs stockés
+        $storedStats = $this->getLuaLogService()->getLogStats($this->getServer());
+        
+        // Calculer les stats des erreurs de console en temps réel
+        $consoleStats = [
+            'critical_errors' => 0,
+            'warnings' => 0,
+            'info' => 0,
+            'total' => 0
+        ];
+        
+        foreach ($this->consoleErrors as $errorKey => $errorData) {
+            $error = $errorData['error'];
+            $level = $error['level'] ?? 'error';
+            
+            switch ($level) {
+                case 'error':
+                    $consoleStats['critical_errors'] += $errorData['count'];
+                    break;
+                case 'warning':
+                    $consoleStats['warnings'] += $errorData['count'];
+                    break;
+                case 'info':
+                    $consoleStats['info'] += $errorData['count'];
+                    break;
+            }
+            
+            $consoleStats['total'] += $errorData['count'];
+        }
+        
+        // Combiner les stats
+        $combinedStats = [
+            'critical_errors' => $storedStats['critical_errors'] + $consoleStats['critical_errors'],
+            'warnings' => $storedStats['warnings'] + $consoleStats['warnings'],
+            'info' => $storedStats['info'] + $consoleStats['info'],
+            'total' => $storedStats['total'] + $consoleStats['total']
+        ];
+        
+        \Log::channel('lua')->debug('Livewire: getStats computed property', [
+            'server_id' => $this->getServer()->id,
+            'stored_stats' => $storedStats,
+            'console_stats' => $consoleStats,
+            'combined_stats' => $combinedStats
+        ]);
+        
+        return $combinedStats;
     }
 
     #[Computed]
