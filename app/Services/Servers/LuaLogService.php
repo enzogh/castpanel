@@ -63,19 +63,30 @@ class LuaLogService
     /**
      * Vérifie si une ligne contient une erreur Lua
      */
+    /**
+     * Vérifie si une ligne contient une erreur Lua
+     * Les erreurs Lua commencent toujours par [ERROR]
+     */
     private function isLuaError(string $line): bool
     {
+        // Vérifier d'abord le pattern principal [ERROR]
+        if (!preg_match('/^\[ERROR\]/i', $line)) {
+            return false;
+        }
+
+        // Vérifier que c'est bien une erreur Lua (pas juste un [ERROR] générique)
         $luaErrorPatterns = [
-            '/^\[ERROR\]/i',
-            '/lua_run:\d+:/',
-            '/attempt to call global/',
-            '/attempt to index/',
-            '/bad argument/',
-            '/syntax error/',
-            '/nil value/',
-            '/missing dependency/',
-            '/failed to load/',
-            '/error in addon/',
+            '/lua_run:\d+:/',           // lua_run:1: attempt to call...
+            '/attempt to call global/',  // attempt to call global 'caca'
+            '/attempt to index/',        // attempt to index nil value
+            '/bad argument/',            // bad argument #1
+            '/syntax error/',            // syntax error
+            '/nil value/',               // nil value
+            '/missing dependency/',      // missing dependency
+            '/failed to load/',          // failed to load
+            '/error in addon/',          // error in addon
+            '/stack traceback:/',        // stack traceback
+            '/lua error/',               // lua error
         ];
 
         foreach ($luaErrorPatterns as $pattern) {
@@ -84,7 +95,9 @@ class LuaLogService
             }
         }
 
-        return false;
+        // Si on a [ERROR] mais pas de pattern Lua spécifique, on considère quand même que c'est une erreur
+        // car [ERROR] indique généralement une erreur Lua dans Garry's Mod
+        return true;
     }
 
     /**
@@ -127,6 +140,15 @@ class LuaLogService
         // Si pas de nom d'addon trouvé, essayer de l'extraire du contexte
         if (strpos($errorLine, 'lua_run:') !== false) {
             return 'Console Command';
+        }
+
+        // Essayer de détecter le nom de l'addon depuis le message d'erreur
+        if (preg_match('/attempt to call global \'([^\']+)\'/', $errorLine, $matches)) {
+            return 'Global Function: ' . $matches[1];
+        }
+
+        if (preg_match('/attempt to index ([^\s]+)/', $errorLine, $matches)) {
+            return 'Index Error: ' . $matches[1];
         }
 
         return 'Unknown Addon';
