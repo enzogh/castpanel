@@ -54,12 +54,6 @@
                         >
                             {{ $showResolved ? 'Masquer résolues' : 'Afficher résolues' }}
                         </button>
-                        <button
-                            wire:click="toggleHideClosed"
-                            class="px-3 py-1 text-sm rounded-md transition-colors {{ $hideClosed ? 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300' : 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300' }}"
-                        >
-                            {{ $hideClosed ? 'Afficher fermées' : 'Masquer fermées' }}
-                        </button>
                     </div>
                 </div>
             </div>

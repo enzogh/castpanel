@@ -414,9 +414,9 @@ class LuaLogService
         }
 
         try {
-            // Récupérer seulement les erreurs ouvertes (non fermées) directement en base
+            // Récupérer seulement les erreurs ouvertes (status = 'open') directement en base
             $query = LuaError::forServer($server->id)
-                ->where('status', '!=', 'closed')
+                ->where('status', 'open')
                 ->whereNull('closed_at');
 
             // Appliquer les filtres
@@ -442,11 +442,11 @@ class LuaLogService
 
             $logs = $query->orderBy('last_seen', 'desc')->get();
 
-            \Log::channel('lua')->info('Open logs retrieved from database (filtered by status)', [
+            \Log::channel('lua')->info('Open logs retrieved from database (status = open only)', [
                 'server_id' => $server->id,
                 'logs_count' => $logs->count(),
                 'filters' => $filters,
-                'query_conditions' => 'status != "closed" AND closed_at IS NULL'
+                'query_conditions' => 'status = "open" AND closed_at IS NULL'
             ]);
 
             return $logs->map(function($log) {

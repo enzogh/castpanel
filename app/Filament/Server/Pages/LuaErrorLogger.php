@@ -57,8 +57,6 @@ class LuaErrorLogger extends Page
     ];
     public $logs = [];
     
-    public $hideClosed = true; // Par défaut, masquer les erreurs fermées
-
     protected ?LuaLogService $luaLogService = null;
 
     public function mount(): void
@@ -263,41 +261,12 @@ class LuaErrorLogger extends Page
         // Le filtrage des erreurs fermées est maintenant fait en base de données
         // Pas besoin de filtrer côté frontend
         
-        // Filtrage de sécurité côté frontend pour masquer les erreurs fermées
-        if ($this->hideClosed) {
-            $allLogs = array_filter($allLogs, function($log) {
-                $isClosed = ($log['status'] ?? 'open') === 'closed' && ($log['closed_at'] ?? null) !== null;
-                
-                if ($isClosed) {
-                    \Log::debug('Livewire: Filtering out closed error on frontend', [
-                        'server_id' => $this->getServer()->id,
-                        'log_id' => $log['id'] ?? 'unknown',
-                        'status' => $log['status'] ?? 'unknown',
-                        'closed_at' => $log['closed_at'] ?? 'NULL',
-                        'message' => substr($log['message'] ?? 'unknown', 0, 50)
-                    ]);
-                }
-                
-                return !$isClosed;
-            });
-            
-            \Log::info('Livewire: Frontend filtering completed (hideClosed enabled)', [
-                'server_id' => $this->getServer()->id,
-                'logs_after_frontend_filter' => count($allLogs)
-            ]);
-        } else {
-            \Log::info('Livewire: Frontend filtering skipped (hideClosed disabled)', [
-                'server_id' => $this->getServer()->id,
-                'logs_count' => count($allLogs)
-            ]);
-        }
-        
         \Log::info('Livewire: Logs prepared for display', [
             'server_id' => $this->getServer()->id,
             'stored_logs_count' => count($storedLogs),
             'console_logs_count' => count($consoleLogs),
             'total_logs' => count($allLogs),
-            'note' => 'Filtering done in database query'
+            'note' => 'Filtering done in database query (status = open only)'
         ]);
         
         // Regrouper les erreurs identiques par message et addon pour éviter les doublons
@@ -518,15 +487,9 @@ class LuaErrorLogger extends Page
     
     public function toggleHideClosed(): void
     {
-        $this->hideClosed = !$this->hideClosed;
-        
-        \Log::info('Livewire: toggleHideClosed called', [
-            'server_id' => $this->getServer()->id,
-            'hide_closed' => $this->hideClosed
-        ]);
-
-        // Actualiser les logs avec le nouveau filtre
-        $this->logs = $this->getLogs();
+        // This method is no longer needed as hideClosed is removed.
+        // Keeping it for now to avoid breaking existing calls, but it will do nothing.
+        \Log::debug('Livewire: toggleHideClosed called, but hideClosed is removed. Doing nothing.');
     }
 
     public function monitorConsole(): void
