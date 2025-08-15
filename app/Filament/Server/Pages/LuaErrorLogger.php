@@ -85,6 +85,9 @@ class LuaErrorLogger extends Page
         // Démarrer immédiatement la surveillance
         $this->startMonitoring();
         
+        // Restaurer la liste des erreurs supprimées depuis le cache
+        $this->restoreDeletedErrors();
+        
         // Initialiser les propriétés publiques avec des valeurs par défaut
         try {
             if ($dbConnected) {
@@ -790,6 +793,9 @@ class LuaErrorLogger extends Page
                 'server_id' => $this->getServer()->id
             ];
             
+            // Persister la liste des erreurs supprimées
+            $this->persistDeletedErrors();
+            
             $this->dispatch('error-deleted', ['error_key' => $errorKey]);
             
             // Rafraîchir les données immédiatement
@@ -857,6 +863,57 @@ class LuaErrorLogger extends Page
             \Log::info('Livewire: Cleaned up deleted errors', [
                 'server_id' => $this->getServer()->id,
                 'cleaned_count' => $cleanedCount
+            ]);
+        }
+    }
+
+    /**
+     * Persiste la liste des erreurs supprimées en base de données
+     */
+    private function persistDeletedErrors(): void
+    {
+        try {
+            // Créer une table temporaire ou utiliser un cache pour stocker les erreurs supprimées
+            $deletedErrorsData = json_encode($this->deletedErrors);
+            
+            // Stocker dans le cache de session ou dans une table dédiée
+            cache()->put("deleted_errors_server_{$this->getServer()->id}", $deletedErrorsData, now()->addDays(7));
+            
+            \Log::info('Livewire: Deleted errors persisted to cache', [
+                'server_id' => $this->getServer()->id,
+                'deleted_errors_count' => count($this->deletedErrors),
+                'cache_key' => "deleted_errors_server_{$this->getServer()->id}"
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Livewire: Failed to persist deleted errors', [
+                'server_id' => $this->getServer()->id,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Restaure la liste des erreurs supprimées depuis le cache
+     */
+    private function restoreDeletedErrors(): void
+    {
+        try {
+            $cacheKey = "deleted_errors_server_{$this->getServer()->id}";
+            $deletedErrorsData = cache()->get($cacheKey);
+            
+            if ($deletedErrorsData) {
+                $this->deletedErrors = json_decode($deletedErrorsData, true) ?: [];
+                
+                \Log::info('Livewire: Deleted errors restored from cache', [
+                    'server_id' => $this->getServer()->id,
+                    'deleted_errors_count' => count($this->deletedErrors),
+                    'cache_key' => $cacheKey
+                ]);
+            }
+        } catch (\Exception $e) {
+            \Log::error('Livewire: Failed to restore deleted errors', [
+                'server_id' => $this->getServer()->id,
+                'error' => $e->getMessage()
             ]);
         }
     }
