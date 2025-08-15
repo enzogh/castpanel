@@ -249,37 +249,42 @@
                                             <span></span>
                                         @endif
                                         
-                                        @if(isset($log['error_key']))
-                                            <div class="flex items-center space-x-2">
-                                                @if($log['resolved'] ?? false)
-                                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                                                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <!-- Boutons d'action pour résoudre les erreurs -->
+                                        <div class="flex items-center space-x-2">
+                                            @if($log['resolved'] ?? false)
+                                                <!-- Erreur résolue -->
+                                                <div class="flex items-center space-x-2">
+                                                    <span class="inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border border-green-200 dark:border-green-700">
+                                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                                                         </svg>
                                                         Résolu
                                                     </span>
                                                     <button
-                                                        wire:click="markAsUnresolved('{{ $log['error_key'] }}')"
-                                                        class="px-2 py-1 text-xs rounded-md transition-colors bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 hover:bg-yellow-200 dark:hover:bg-yellow-800/30"
+                                                        wire:click="markAsUnresolved('{{ $log['error_key'] ?? $this->createErrorKey($log) }}')"
+                                                        class="inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 border border-yellow-200 dark:border-yellow-700 hover:bg-yellow-200 dark:hover:bg-yellow-800 transition-all duration-200 hover:scale-105"
                                                         title="Marquer comme non résolu"
                                                     >
-                                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                                                         </svg>
+                                                        Réouvrir
                                                     </button>
-                                                @else
-                                                    <button
-                                                        wire:click="markAsResolved('{{ $log['error_key'] }}')"
-                                                        class="px-2 py-1 text-xs rounded-md transition-colors bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800/30"
-                                                        title="Marquer comme résolu"
-                                                    >
-                                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                                                        </svg>
-                                                    </button>
-                                                @endif
-                                            </div>
-                                        @endif
+                                                </div>
+                                            @else
+                                                <!-- Erreur non résolue -->
+                                                <button
+                                                    wire:click="markAsResolved('{{ $log['error_key'] ?? $this->createErrorKey($log) }}')"
+                                                    class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700 text-white border border-green-600 dark:border-green-700 transition-all duration-200 hover:scale-105 shadow-md hover:shadow-lg"
+                                                    title="Marquer cette erreur comme résolue"
+                                                >
+                                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                                    </svg>
+                                                    Résoudre
+                                                </button>
+                                            @endif
+                                        </div>
                                     </div>
                                     <div class="flex items-start space-x-2">
                                         <div class="flex-shrink-0">
@@ -290,29 +295,42 @@
                                         <div class="flex-1 min-w-0">
                                             <div class="flex items-center space-x-2 mb-1">
                                                 @if(isset($log['count']) && $log['count'] > 1)
-                                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
+                                                    <span class="inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 border border-orange-200 dark:border-orange-700">
+                                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                                        </svg>
                                                         Erreur répétée ({{ $log['count'] }}x)
                                                     </span>
                                                 @else
-                                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium {{ $log['level'] === 'error' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' : ($log['level'] === 'warning' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200') }}">
+                                                    <span class="inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium {{ $log['level'] === 'error' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 border border-red-200 dark:border-red-700' : ($log['level'] === 'warning' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 border border-yellow-200 dark:border-yellow-700' : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border border-blue-200 dark:border-blue-700') }}">
                                                         {{ ucfirst($log['level'] ?? 'info') }}
                                                     </span>
                                                 @endif
                                                 @if(isset($log['addon']) && $log['addon'] !== 'unknown')
-                                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                                                    <span class="inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-600">
+                                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2H5a2 2 0 00-2 2v2m14 0V7a2 2 0 00-2-2H5a2 2 0 00-2 2v2"></path>
+                                                        </svg>
                                                         {{ $log['addon'] }}
                                                     </span>
                                                 @endif
                                             </div>
-                                            <p class="text-sm text-gray-900 dark:text-white font-mono break-all">
-                                                {{ $log['message'] }}
-                                            </p>
+                                            <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+                                                <p class="text-sm text-gray-900 dark:text-white font-mono break-all leading-relaxed">
+                                                    {{ $log['message'] }}
+                                                </p>
+                                            </div>
                                             @if(isset($log['stack_trace']) && !empty($log['stack_trace']))
-                                                <details class="mt-2">
-                                                    <summary class="text-xs text-gray-500 dark:text-gray-400 cursor-pointer hover:text-gray-700 dark:hover:text-gray-300">
+                                                <details class="mt-3">
+                                                    <summary class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 cursor-pointer hover:text-gray-800 dark:hover:text-gray-200 bg-gray-100 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                                        </svg>
                                                         Voir la stack trace
                                                     </summary>
-                                                    <pre class="mt-2 text-xs text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 p-2 rounded border overflow-x-auto">{{ $log['stack_trace'] }}</pre>
+                                                    <div class="mt-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                                        <pre class="text-xs text-gray-600 dark:text-gray-400 p-4 overflow-x-auto leading-relaxed">{{ $log['stack_trace'] }}</pre>
+                                                    </div>
                                                 </details>
                                             @endif
                                         </div>
