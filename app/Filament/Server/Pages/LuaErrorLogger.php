@@ -245,31 +245,15 @@ class LuaErrorLogger extends Page
         }
         unset($log);
         
-        // Filtrer les erreurs fermées (status = 'closed' ET closed_at IS NOT NULL)
-        $allLogs = array_filter($allLogs, function($log) {
-            $shouldHide = ($log['status'] === 'closed' && $log['closed_at'] !== null);
-            
-            \Log::debug('Livewire: Filtering log', [
-                'server_id' => $this->getServer()->id,
-                'log_id' => $log['id'] ?? 'unknown',
-                'status' => $log['status'] ?? 'unknown',
-                'closed_at' => $log['closed_at'] ?? 'NULL',
-                'should_hide' => $shouldHide,
-                'message' => substr($log['message'] ?? 'unknown', 0, 50)
-            ]);
-            
-            return !$shouldHide;
-        });
+        // Le filtrage des erreurs fermées est maintenant fait en base de données
+        // Pas besoin de filtrer côté frontend
         
-        \Log::info('Livewire: Filtering completed', [
+        \Log::info('Livewire: Logs prepared for display', [
             'server_id' => $this->getServer()->id,
-            'total_logs_before_filter' => count($allLogs) + count(array_filter($allLogs, function($log) {
-                return ($log['status'] === 'closed' && $log['closed_at'] !== null);
-            })),
-            'visible_logs_after_filter' => count($allLogs),
-            'hidden_logs' => count(array_filter($allLogs, function($log) {
-                return ($log['status'] === 'closed' && $log['closed_at'] !== null);
-            }))
+            'stored_logs_count' => count($storedLogs),
+            'console_logs_count' => count($consoleLogs),
+            'total_logs' => count($allLogs),
+            'note' => 'Filtering done in database query'
         ]);
         
         // Regrouper les erreurs identiques par message et addon pour éviter les doublons

@@ -414,8 +414,12 @@ class LuaLogService
         }
 
         try {
-            // Récupérer toutes les erreurs sans filtrage en base
-            $query = LuaError::forServer($server->id);
+            // Récupérer seulement les erreurs visibles (non fermées) directement en base
+            $query = LuaError::forServer($server->id)
+                ->where(function($q) {
+                    $q->where('status', '!=', 'closed')
+                      ->orWhereNull('closed_at');
+                });
 
             // Appliquer les filtres
             if (isset($filters['resolved'])) {
@@ -440,10 +444,11 @@ class LuaLogService
 
             $logs = $query->orderBy('last_seen', 'desc')->get();
 
-            \Log::channel('lua')->info('All logs retrieved from database (filtering will be done in frontend)', [
+            \Log::channel('lua')->info('Visible logs retrieved from database (filtered by status)', [
                 'server_id' => $server->id,
                 'logs_count' => $logs->count(),
-                'filters' => $filters
+                'filters' => $filters,
+                'query_conditions' => 'status != "closed" OR closed_at IS NULL'
             ]);
 
             return $logs->map(function($log) {
