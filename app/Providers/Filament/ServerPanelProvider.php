@@ -47,11 +47,14 @@ class ServerPanelProvider extends PanelProvider
             ])
             ->navigationGroups([
                 NavigationGroup::make('Gestion du serveur')
-                    ->collapsible(false),
+                    ->collapsible(true)
+                    ->collapsed(false),
                 NavigationGroup::make('Outils et surveillance')
-                    ->collapsible(false),
+                    ->collapsible(true)
+                    ->collapsed(false),
                 NavigationGroup::make('Configuration')
-                    ->collapsible(false),
+                    ->collapsible(true)
+                    ->collapsed(false),
             ])
             ->discoverResources(in: app_path('Filament/Server/Resources'), for: 'App\\Filament\\Server\\Resources')
             ->discoverPages(in: app_path('Filament/Server/Pages'), for: 'App\\Filament\\Server\\Pages')
