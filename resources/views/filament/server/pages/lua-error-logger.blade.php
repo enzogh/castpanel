@@ -68,7 +68,7 @@
             <!-- Protection contre les erreurs de type -->
             @php
                 // S'assurer que $logs est toujours un tableau
-                if (!is_array($logs)) {
+                if (!isset($logs) || !is_array($logs)) {
                     $logs = [];
                 }
             @endphp
@@ -84,7 +84,7 @@
                             <h3 class="text-sm font-medium text-blue-800 dark:text-blue-200">Surveillance de la console</h3>
                             <p class="text-xs text-blue-600 dark:text-blue-400">
                                 Capture automatique des erreurs Lua [ERROR] 
-                                @if(is_array($logs))
+                                @if(isset($logs) && is_array($logs))
                                     ({{ count($logs) }} erreur(s) ouverte(s))
                                 @else
                                     (Erreurs en cours de chargement...)
@@ -133,7 +133,7 @@
                         
                         <!-- Corps du tableau -->
                         <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-                            @if(is_array($logs) && count($logs) > 0)
+                            @if(isset($logs) && is_array($logs) && count($logs) > 0)
                                 @foreach($logs as $log)
                                     <tr class="hover:scale-[1.01] hover:shadow-sm transition-all duration-200 {{ $log['resolved'] ?? false ? 'opacity-60 bg-green-50 dark:bg-green-900/20' : '' }}">
                                         <!-- Première fois -->
@@ -225,17 +225,29 @@
                                     </tr>
                                 @endforeach
                             @else
-                                <!-- Ligne vide quand pas d'erreurs -->
+                                <!-- Ligne vide quand pas d'erreurs ou logs non définis -->
                                 <tr>
                                     <td colspan="4" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                                         <div class="flex flex-col items-center">
-                                            <svg class="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                            </svg>
-                                            <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">Aucune erreur ouverte trouvée</h3>
-                                            <p class="text-sm text-gray-500 dark:text-gray-400">
-                                                Toutes les erreurs sont fermées ou résolues.
-                                            </p>
+                                            @if(!isset($logs))
+                                                <!-- Logs non encore chargés -->
+                                                <svg class="w-12 h-12 text-blue-400 mb-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                                </svg>
+                                                <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">Chargement des erreurs...</h3>
+                                                <p class="text-sm text-gray-500 dark:text-gray-400">
+                                                    Surveillance de la console en cours...
+                                                </p>
+                                            @else
+                                                <!-- Aucune erreur trouvée -->
+                                                <svg class="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                                </svg>
+                                                <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">Aucune erreur ouverte trouvée</h3>
+                                                <p class="text-sm text-gray-500 dark:text-gray-400">
+                                                    Toutes les erreurs sont fermées ou résolues.
+                                                </p>
+                                            @endif
                                         </div>
                                     </td>
                                 </tr>
