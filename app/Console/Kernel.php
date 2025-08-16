@@ -61,5 +61,17 @@ class Kernel extends ConsoleKernel
 
         $schedule->command(ScheduleCheckHeartbeatCommand::class)->everyMinute();
         $schedule->command(RunHealthChecksCommand::class)->everyFiveMinutes();
+        
+        // Surveillance des erreurs Lua toutes les minutes
+        $schedule->command('lua:monitor-servers')
+            ->everyMinute()
+            ->withoutOverlapping()
+            ->runInBackground()
+            ->onSuccess(function () {
+                \Log::info('LuaMonitor: Scheduled monitoring completed successfully');
+            })
+            ->onFailure(function () {
+                \Log::error('LuaMonitor: Scheduled monitoring failed');
+            });
     }
 }

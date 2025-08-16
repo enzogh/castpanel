@@ -4,6 +4,7 @@ namespace App\Services\Servers;
 
 use App\Models\LuaError;
 use App\Models\Server;
+use App\Notifications\LuaErrorDetected;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -327,6 +328,21 @@ class LuaConsoleMonitorService
                     ]);
                     
                     $newErrors[] = $luaError;
+                    
+                    // Envoyer une notification au propriétaire du serveur
+                    try {
+                        $server->user->notify(new LuaErrorDetected($server, $luaError));
+                        Log::info('LuaConsoleMonitor: Notification sent for new error', [
+                            'server_id' => $server->id,
+                            'user_id' => $server->user->id,
+                            'error_id' => $luaError->id
+                        ]);
+                    } catch (\Exception $e) {
+                        Log::warning('LuaConsoleMonitor: Failed to send notification', [
+                            'server_id' => $server->id,
+                            'error' => $e->getMessage()
+                        ]);
+                    }
                     
                     Log::info('LuaConsoleMonitor: New error created', [
                         'server_id' => $server->id,
