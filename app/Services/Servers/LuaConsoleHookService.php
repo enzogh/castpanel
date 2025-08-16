@@ -48,6 +48,11 @@ class LuaConsoleHookService
     private bool $streamingMode = false;
 
     /**
+     * @var array
+     */
+    private array $detectedErrors = [];
+
+    /**
      * @var int|null
      */
     private ?int $targetServerId = null;
@@ -72,7 +77,13 @@ class LuaConsoleHookService
 
         try {
             $this->loadServers();
-            $this->startMonitoringLoop();
+            
+            // Si on est en mode daemon, démarrer en arrière-plan
+            if ($this->isDaemonMode()) {
+                $this->startDaemonMode();
+            } else {
+                $this->startMonitoringLoop();
+            }
         } catch (\Exception $e) {
             Log::error('LuaConsoleHook: Failed to start monitoring', [
                 'error' => $e->getMessage(),
@@ -81,6 +92,91 @@ class LuaConsoleHookService
             $this->isRunning = false;
             throw $e;
         }
+    }
+
+    /**
+     * Démarre le service en mode daemon (arrière-plan)
+     */
+    private function startDaemonMode(): void
+    {
+        Log::info('LuaConsoleHook: Starting in daemon mode');
+        
+        // Fork le processus pour le mettre en arrière-plan
+        $pid = pcntl_fork();
+        
+        if ($pid == -1) {
+            // Échec du fork
+            Log::error('LuaConsoleHook: Failed to fork process');
+            throw new \Exception('Failed to fork process');
+        } elseif ($pid) {
+            // Processus parent
+            Log::info('LuaConsoleHook: Daemon started with PID: ' . $pid);
+            
+            // Sauvegarder le PID
+            $pidFile = storage_path('lua-console-hook.pid');
+            file_put_contents($pidFile, $pid);
+            
+            return;
+        } else {
+            // Processus enfant (daemon)
+            $this->setupDaemonProcess();
+            $this->startMonitoringLoop();
+        }
+    }
+
+    /**
+     * Configure le processus daemon
+     */
+    private function setupDaemonProcess(): void
+    {
+        // Détacher du terminal
+        if (posix_setsid() == -1) {
+            Log::error('LuaConsoleHook: Failed to detach from terminal');
+            exit(1);
+        }
+        
+        // Configurer la gestion des signaux
+        pcntl_signal(SIGTERM, [$this, 'handleSignal']);
+        pcntl_signal(SIGINT, [$this, 'handleSignal']);
+        pcntl_signal(SIGHUP, [$this, 'handleSignal']);
+        
+        Log::info('LuaConsoleHook: Daemon process configured');
+    }
+
+    /**
+     * Gère les signaux système
+     */
+    public function handleSignal(int $signal): void
+    {
+        switch ($signal) {
+            case SIGTERM:
+            case SIGINT:
+                Log::info('LuaConsoleHook: Received termination signal');
+                $this->stopHooking();
+                exit(0);
+                break;
+            case SIGHUP:
+                Log::info('LuaConsoleHook: Received reload signal');
+                $this->reloadConfiguration();
+                break;
+        }
+    }
+
+    /**
+     * Recharge la configuration du service
+     */
+    private function reloadConfiguration(): void
+    {
+        Log::info('LuaConsoleHook: Reloading configuration');
+        $this->loadServers();
+    }
+
+    /**
+     * Vérifie si on est en mode daemon
+     */
+    private function isDaemonMode(): bool
+    {
+        return !$this->debugMode && !$this->streamingMode;
     }
 
     /**
@@ -93,11 +189,42 @@ class LuaConsoleHookService
     }
 
     /**
+     * Arrête le service daemon en arrière-plan
+     */
+    public function stopDaemon(): void
+    {
+        $pidFile = storage_path('lua-console-hook.pid');
+        
+        if (file_exists($pidFile)) {
+            $pid = file_get_contents($pidFile);
+            if (is_numeric($pid) && posix_kill($pid, SIGTERM)) {
+                Log::info('LuaConsoleHook: Daemon stopped (PID: ' . $pid . ')');
+                unlink($pidFile);
+            } else {
+                Log::warning('LuaConsoleHook: Failed to stop daemon (PID: ' . $pid . ')');
+            }
+        } else {
+            Log::warning('LuaConsoleHook: No PID file found');
+        }
+    }
+
+    /**
      * Vérifie si le service est en cours d'exécution
      */
     public function isRunning(): bool
     {
         return $this->isRunning;
+    }
+
+    /**
+     * Réinitialise le cache des erreurs détectées
+     */
+    public function resetErrorCache(): void
+    {
+        $this->detectedErrors = [];
+        if ($this->debugMode) {
+            echo "🔄 Error cache reset - Will detect all errors again\n";
+        }
     }
 
     /**
@@ -737,11 +864,24 @@ class LuaConsoleHookService
     {
         foreach ($errors as $error) {
             try {
+                // Créer une clé unique pour cette erreur
+                $errorKey = md5($error['content'] . $server->id . $error['line']);
+                
+                // Vérifier si l'erreur a déjà été détectée dans cette session
+                if (isset($this->detectedErrors[$errorKey])) {
+                    continue; // Erreur déjà détectée
+                }
+                
+                // Marquer cette erreur comme détectée
+                $this->detectedErrors[$errorKey] = true;
+                
                 if ($this->debugMode) {
-                    // En mode debug, simuler la détection d'erreur sans base de données
+                    // En mode debug, afficher l'erreur
                     echo "🚨 NEW ERROR DETECTED! Server: {$server->name} - Type: {$error['type']} - Line: {$error['line']}\n";
                     echo "   Content: {$error['content']}\n";
-                    continue;
+                    if ($error['stack_trace']) {
+                        echo "   Stack Trace:\n{$error['stack_trace']}\n";
+                    }
                 }
 
                 // Vérifier si l'erreur n'a pas déjà été enregistrée
