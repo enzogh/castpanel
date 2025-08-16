@@ -127,32 +127,9 @@ class LuaErrorLogger extends Page implements HasTable
      */
     public function table(Table $table): Table
     {
-        // Debug: vérifier la requête
         $serverId = $this->getServer()->id;
         $query = LuaError::query()->where('server_id', $serverId);
-        $count = $query->count();
-        
-        Log::info('LuaErrorLogger: Table configuration', [
-            'server_id' => $serverId,
-            'query_count' => $count,
-            'query_sql' => $query->toSql(),
-            'query_bindings' => $query->getBindings()
-        ]);
 
-        // Vérifier si on a des erreurs
-        if ($count === 0) {
-            Log::warning('LuaErrorLogger: No errors found for server', [
-                'server_id' => $serverId
-            ]);
-        } else {
-            // Afficher quelques erreurs pour debug
-            $sampleErrors = $query->limit(3)->get(['id', 'message', 'level']);
-            Log::info('LuaErrorLogger: Sample errors found', [
-                'sample_errors' => $sampleErrors->toArray()
-            ]);
-        }
-
-        // Version très simple pour diagnostiquer
         return $table
             ->query($query)
             ->columns([
@@ -161,27 +138,146 @@ class LuaErrorLogger extends Page implements HasTable
                     ->sortable()
                     ->grow(false),
 
-                TextColumn::make('message')
-                    ->label('Message')
-                    ->limit(100)
-                    ->grow(),
+                TextColumn::make('first_seen')
+                    ->label('Première fois')
+                    ->dateTime('d/m/Y H:i:s')
+                    ->sortable()
+                    ->grow(false),
 
                 TextColumn::make('level')
                     ->label('Niveau')
+                    ->badge()
+                    ->color(fn ($state) => match($state) {
+                        'ERROR' => 'danger',
+                        'WARNING' => 'warning',
+                        'INFO' => 'info',
+                        default => 'gray'
+                    })
+                    ->grow(false),
+
+                TextColumn::make('message')
+                    ->label('Message d\'erreur')
+                    ->limit(80)
+                    ->searchable()
+                    ->grow(),
+
+                TextColumn::make('resolved')
+                    ->label('Statut')
+                    ->badge()
+                    ->color(fn ($state) => $state ? 'success' : 'warning')
+                    ->label(fn ($state) => $state ? 'Résolu' : 'Ouvert')
                     ->grow(false),
             ])
+            ->filters([
+                SelectFilter::make('level')
+                    ->label('Niveau')
+                    ->options([
+                        'ERROR' => 'Erreur',
+                        'WARNING' => 'Avertissement',
+                        'INFO' => 'Information'
+                    ]),
+
+                SelectFilter::make('resolved')
+                    ->label('Statut')
+                    ->options([
+                        '0' => 'Non résolues',
+                        '1' => 'Résolues'
+                    ])
+                    ->query(function ($query, array $data) {
+                        if (isset($data['value'])) {
+                            $query->where('resolved', $data['value'] === '1');
+                        }
+                    }),
+
+                Filter::make('search')
+                    ->form([
+                        TextInput::make('search')
+                            ->label('Rechercher')
+                            ->placeholder('Rechercher dans les messages...')
+                    ])
+                    ->query(function ($query, array $data) {
+                        if (!empty($data['search'])) {
+                            $query->where('message', 'like', '%' . $data['search'] . '%');
+                        }
+                    }),
+            ])
             ->actions([
+                TableAction::make('resolve')
+                    ->label('Résoudre')
+                    ->icon('tabler-check')
+                    ->color('success')
+                    ->visible(fn (LuaError $record) => $record && !$record->resolved)
+                    ->action(fn (LuaError $record) => $this->markAsResolved($record->error_key))
+                    ->requiresConfirmation()
+                    ->modalHeading('Marquer comme résolu')
+                    ->modalDescription('Êtes-vous sûr de vouloir marquer cette erreur comme résolue ?')
+                    ->modalSubmitActionLabel('Résoudre'),
+
+                TableAction::make('unresolve')
+                    ->label('Rouvrir')
+                    ->icon('tabler-x')
+                    ->color('warning')
+                    ->visible(fn (LuaError $record) => $record && $record->resolved)
+                    ->action(fn (LuaError $record) => $this->markAsUnresolved($record->error_key))
+                    ->requiresConfirmation()
+                    ->modalHeading('Rouvrir l\'erreur')
+                    ->modalDescription('Êtes-vous sûr de vouloir rouvrir cette erreur ?')
+                    ->modalSubmitActionLabel('Rouvrir'),
+
+                TableAction::make('delete')
+                    ->label('Supprimer')
+                    ->icon('tabler-trash')
+                    ->color('danger')
+                    ->action(fn (LuaError $record) => $this->deleteError($record->error_key))
+                    ->requiresConfirmation()
+                    ->modalHeading('Supprimer l\'erreur')
+                    ->modalDescription('Êtes-vous sûr de vouloir supprimer cette erreur ? Cette action est irréversible.')
+                    ->modalSubmitActionLabel('Supprimer'),
+
                 TableAction::make('view')
-                    ->label('Voir')
+                    ->label('Voir détails')
                     ->icon('tabler-eye')
-                    ->action(fn (LuaError $record) => $this->viewError($record))
+                    ->color('info')
                     ->modalContent(fn (LuaError $record) => view('filament.server.modals.lua-error-details', ['error' => $record]))
                     ->modalSubmitAction(false)
                     ->modalCancelActionLabel('Fermer'),
             ])
-            ->defaultSort('id', 'desc')
-            ->paginated([10, 25, 50])
-            ->defaultPaginationPageOption(10);
+            ->bulkActions([
+                BulkAction::make('resolve_selected')
+                    ->label('Résoudre la sélection')
+                    ->icon('tabler-check')
+                    ->color('success')
+                    ->action(function ($records) {
+                        foreach ($records as $record) {
+                            if ($record) {
+                                $this->markAsResolved($record->error_key);
+                            }
+                        }
+                    })
+                    ->requiresConfirmation()
+                    ->modalHeading('Résoudre les erreurs sélectionnées')
+                    ->modalDescription('Êtes-vous sûr de vouloir marquer ces erreurs comme résolues ?')
+                    ->modalSubmitActionLabel('Résoudre'),
+
+                BulkAction::make('delete_selected')
+                    ->label('Supprimer la sélection')
+                    ->icon('tabler-trash')
+                    ->color('danger')
+                    ->action(function ($records) {
+                        foreach ($records as $record) {
+                            if ($record) {
+                                $this->deleteError($record->error_key);
+                            }
+                        }
+                    })
+                    ->requiresConfirmation()
+                    ->modalHeading('Supprimer les erreurs sélectionnées')
+                    ->modalDescription('Êtes-vous sûr de vouloir supprimer ces erreurs ? Cette action est irréversible.')
+                    ->modalSubmitActionLabel('Supprimer'),
+            ])
+            ->defaultSort('first_seen', 'desc')
+            ->paginated([25, 50, 100])
+            ->defaultPaginationPageOption(25);
     }
 
     /**
@@ -192,22 +288,8 @@ class LuaErrorLogger extends Page implements HasTable
         try {
             $serverId = $this->getServer()->id;
             
-            // Debug: afficher l'ID du serveur
-            Log::info('Livewire: Loading logs for server', ['server_id' => $serverId]);
-            
             // Requête de base
             $query = LuaError::where('server_id', $serverId);
-
-            // Debug: compter le total avant filtres
-            $totalBeforeFilters = $query->count();
-            Log::info('Livewire: Total errors before filters', ['count' => $totalBeforeFilters]);
-
-            // Si pas d'erreurs, retourner vide
-            if ($totalBeforeFilters === 0) {
-                Log::warning('Livewire: No errors found for server', ['server_id' => $serverId]);
-                $this->logs = [];
-                return;
-            }
 
             // Filtre de recherche
             if (!empty($this->search)) {
@@ -244,28 +326,7 @@ class LuaErrorLogger extends Page implements HasTable
                 });
             }
 
-            // Debug: afficher la requête SQL
-            $sql = $query->toSql();
-            $bindings = $query->getBindings();
-            Log::info('Livewire: SQL query', ['sql' => $sql, 'bindings' => $bindings]);
-
             $this->logs = $query->orderBy('first_seen', 'desc')->get()->toArray();
-
-            // Debug: afficher le résultat final
-            Log::info('Livewire: Logs loaded successfully', [
-                'server_id' => $serverId,
-                'total_before_filters' => $totalBeforeFilters,
-                'logs_count' => count($this->logs),
-                'show_resolved' => $this->showResolved,
-                'filters' => [
-                    'search' => $this->search,
-                    'level' => $this->levelFilter,
-                    'time' => $this->timeFilter
-                ],
-                'first_log' => $this->logs[0] ?? 'no logs',
-                'sql_query' => $sql,
-                'sql_bindings' => $bindings
-            ]);
 
         } catch (\Exception $e) {
             Log::error('Livewire: Failed to load logs', [
@@ -289,135 +350,128 @@ class LuaErrorLogger extends Page implements HasTable
         return $this->logs;
     }
 
+    /**
+     * Affiche une erreur
+     */
+    public function viewError(LuaError $record): void
+    {
+        Log::info('LuaErrorLogger: Viewing error', [
+            'error_id' => $record->id,
+            'message' => $record->message
+        ]);
+    }
+
+    /**
+     * Marque une erreur comme résolue
+     */
     public function markAsResolved(string $errorKey): void
     {
         try {
-            $error = LuaError::where('error_key', $errorKey)
-                ->where('server_id', $this->getServer()->id)
-                ->first();
-
+            $error = LuaError::where('error_key', $errorKey)->first();
             if ($error) {
-                $error->markAsResolved();
-                
-                Log::info('Livewire: Error marked as resolved', [
-                    'server_id' => $this->getServer()->id,
-                    'error_key' => $errorKey
+                $error->update([
+                    'resolved' => true,
+                    'resolved_at' => now(),
                 ]);
-
-                // Recharger les logs
-                $this->loadLogs();
+                
+                $this->notify('success', 'Erreur marquée comme résolue');
             }
-
         } catch (\Exception $e) {
-            Log::error('Livewire: Failed to mark error as resolved', [
-                'server_id' => $this->getServer()->id,
-                'error_key' => $errorKey,
-                'error' => $e->getMessage()
-            ]);
+            Log::error('Erreur lors de la résolution', ['error' => $e->getMessage()]);
+            $this->notify('danger', 'Erreur lors de la résolution');
         }
     }
 
+    /**
+     * Marque une erreur comme non résolue
+     */
+    public function markAsUnresolved(string $errorKey): void
+    {
+        try {
+            $error = LuaError::where('error_key', $errorKey)->first();
+            if ($error) {
+                $error->update([
+                    'resolved' => false,
+                    'resolved_at' => null,
+                ]);
+                
+                $this->notify('success', 'Erreur rouverte');
+            }
+        } catch (\Exception $e) {
+            Log::error('Erreur lors de la réouverture', ['error' => $e->getMessage()]);
+            $this->notify('danger', 'Erreur lors de la réouverture');
+        }
+    }
+
+    /**
+     * Supprime une erreur
+     */
     public function deleteError(string $errorKey): void
     {
         try {
-            $error = LuaError::where('error_key', $errorKey)
-                ->where('server_id', $this->getServer()->id)
-                ->first();
-
+            $error = LuaError::where('error_key', $errorKey)->first();
             if ($error) {
                 $error->delete();
-                
-                Log::info('Livewire: Error deleted', [
-                    'server_id' => $this->getServer()->id,
-                    'error_key' => $errorKey
-                ]);
-
-                // Recharger les logs
-                $this->loadLogs();
+                $this->notify('success', 'Erreur supprimée');
             }
-
         } catch (\Exception $e) {
-            Log::error('Livewire: Failed to delete error', [
-                'server_id' => $this->getServer()->id,
-                'error_key' => $errorKey,
-                'error' => $e->getMessage()
-            ]);
+            Log::error('Erreur lors de la suppression', ['error' => $e->getMessage()]);
+            $this->notify('danger', 'Erreur lors de la suppression');
         }
     }
 
-    public function refreshLogs(): void
-    {
-        $this->loadLogs(); // Utiliser loadLogs pour rafraîchir les logs
-    }
-
+    /**
+     * Vide tous les logs
+     */
     public function clearLogs(): void
     {
         try {
-            LuaError::where('server_id', $this->getServer()->id)->delete();
+            $serverId = $this->getServer()->id;
+            $deleted = LuaError::where('server_id', $serverId)->delete();
             
-            Log::info('Livewire: Logs cleared', [
-                'server_id' => $this->getServer()->id
-            ]);
-
-            // Recharger les logs (sera vide)
-            $this->loadLogs();
-
+            $this->notify('success', "{$deleted} erreurs supprimées");
         } catch (\Exception $e) {
-            Log::error('Livewire: Failed to clear logs', [
-                'server_id' => $this->getServer()->id,
-                'error' => $e->getMessage()
-            ]);
+            Log::error('Erreur lors du nettoyage', ['error' => $e->getMessage()]);
+            $this->notify('danger', 'Erreur lors du nettoyage');
         }
     }
 
-    public function exportLogs(string $format): void
+    /**
+     * Exporte les logs
+     */
+    public function exportLogs(): void
     {
         try {
-            $logs = $this->getLogs();
+            $serverId = $this->getServer()->id;
+            $errors = LuaError::where('server_id', $serverId)
+                ->orderBy('first_seen', 'desc')
+                ->get();
+
+            $content = "ID,Date première détection,Niveau,Message,Addon,Statut\n";
+            foreach ($errors as $error) {
+                $content .= sprintf(
+                    "%s,%s,%s,%s,%s,%s\n",
+                    $error->id,
+                    $error->first_seen,
+                    $error->level,
+                    str_replace(',', ';', $error->message),
+                    $error->addon,
+                    $error->resolved ? 'Résolu' : 'Ouvert'
+                );
+            }
+
+            $filename = "lua-errors-server-{$serverId}-" . now()->format('Y-m-d-H-i-s') . ".csv";
             
-            if (empty($logs)) {
-                return;
-            }
-
-            $content = '';
-            $filename = 'lua-errors-' . $this->getServer()->id . '-' . now()->format('Y-m-d') . '.' . $format;
-            $contentType = '';
-
-            switch ($format) {
-                case 'json':
-                    $content = json_encode($logs, JSON_PRETTY_PRINT);
-                    $contentType = 'application/json';
-                    break;
-                    
-                case 'csv':
-                    $content = $this->toCsv($logs);
-                    $contentType = 'text/csv';
-                    break;
-                    
-                case 'txt':
-                    $content = $this->toText($logs);
-                    $contentType = 'text/plain';
-                    break;
-            }
-
-            // Déclencher le téléchargement via JavaScript
             $this->dispatch('download-file', [
-                'content' => $content,
                 'filename' => $filename,
-                'contentType' => $contentType
+                'content' => $content,
+                'mime' => 'text/csv'
             ]);
 
-            Log::info('Livewire: Logs exported', [
-                'server_id' => $this->getServer()->id,
-                'format' => $format
-            ]);
-
+            $this->notify('success', 'Export terminé');
         } catch (\Exception $e) {
-            Log::error('Livewire: Failed to export logs', [
-                'server_id' => $this->getServer()->id,
-                'format' => $format,
-                'error' => $e->getMessage()
-            ]);
+            Log::error('Erreur lors de l\'export', ['error' => $e->getMessage()]);
+            $this->notify('danger', 'Erreur lors de l\'export');
         }
     }
 
@@ -435,37 +489,6 @@ class LuaErrorLogger extends Page implements HasTable
         
         // Recharger les logs avec le nouveau filtre
         $this->loadLogs();
-    }
-
-    /**
-     * Marque une erreur comme non résolue
-     */
-    public function markAsUnresolved(string $errorKey): void
-    {
-        try {
-            $error = LuaError::where('error_key', $errorKey)
-                ->where('server_id', $this->getServer()->id)
-                ->first();
-
-            if ($error) {
-                $error->markAsUnresolved();
-                
-                Log::info('Livewire: Error marked as unresolved', [
-                    'server_id' => $this->getServer()->id,
-                    'error_key' => $errorKey
-                ]);
-
-                // Recharger les logs
-                $this->loadLogs();
-            }
-
-        } catch (\Exception $e) {
-            Log::error('Livewire: Failed to mark error as unresolved', [
-                'server_id' => $this->getServer()->id,
-                'error_key' => $errorKey,
-                'error' => $e->getMessage()
-            ]);
-        }
     }
 
     /**
@@ -570,7 +593,7 @@ class LuaErrorLogger extends Page implements HasTable
     }
 
     /**
-     * Force le refresh du tableau
+     * Rafraîchit le tableau
      */
     public function refreshTable(): void
     {
@@ -578,110 +601,24 @@ class LuaErrorLogger extends Page implements HasTable
         Log::info('LuaErrorLogger: Table refreshed');
     }
 
-    /**
-     * Méthode de test pour vérifier la base de données
-     */
-    public function testDatabase(): void
-    {
-        try {
-            $serverId = $this->getServer()->id;
-            
-            // Vérifier le total d'erreurs pour ce serveur
-            $totalErrors = LuaError::where('server_id', $serverId)->count();
-            
-            // Vérifier quelques erreurs
-            $sampleErrors = LuaError::where('server_id', $serverId)
-                ->limit(5)
-                ->get(['id', 'message', 'addon', 'first_seen', 'resolved', 'status']);
-            
-            // Vérifier toutes les erreurs (sans filtres)
-            $allErrors = LuaError::all(['id', 'server_id', 'message', 'resolved', 'status']);
-            
-            // Vérifier les erreurs résolues vs non résolues
-            $resolvedErrors = LuaError::where('server_id', $serverId)->where('resolved', true)->count();
-            $unresolvedErrors = LuaError::where('server_id', $serverId)->where('resolved', false)->count();
-            $nullResolvedErrors = LuaError::where('server_id', $serverId)->whereNull('resolved')->count();
-            
-            Log::info('Livewire: Database test results', [
-                'server_id' => $serverId,
-                'total_errors_for_server' => $totalErrors,
-                'resolved_errors' => $resolvedErrors,
-                'unresolved_errors' => $unresolvedErrors,
-                'null_resolved_errors' => $nullResolvedErrors,
-                'sample_errors' => $sampleErrors->toArray(),
-                'total_errors_in_table' => $allErrors->count(),
-                'all_errors_server_ids' => $allErrors->pluck('server_id')->unique()->toArray()
-            ]);
-            
-            // Afficher dans la session pour debug
-            session()->flash('debug_info', [
-                'server_id' => $serverId,
-                'total_errors_for_server' => $totalErrors,
-                'resolved_errors' => $resolvedErrors,
-                'unresolved_errors' => $unresolvedErrors,
-                'null_resolved_errors' => $nullResolvedErrors,
-                'total_errors_in_table' => $allErrors->count(),
-                'sample_errors' => $sampleErrors->toArray()
-            ]);
-            
-            // Forcer le refresh du tableau
-            $this->refreshTable();
-            
-        } catch (\Exception $e) {
-            Log::error('Livewire: Database test failed', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            
-            session()->flash('debug_error', $e->getMessage());
-        }
-    }
-
     protected function getHeaderActions(): array
     {
         return [
-            Action::make('refresh')
-                ->label('Actualiser')
-                ->icon('tabler-refresh')
-                ->color('primary')
-                ->action(fn () => $this->refreshLogs()),
-            ActionGroup::make([
-                Action::make('clear_logs')
-                    ->label('Effacer les logs')
-                    ->icon('tabler-trash')
-                    ->color('danger')
-                    ->requiresConfirmation()
-                    ->action(fn () => $this->clearLogs()),
-                Action::make('export_json')
-                    ->label('Exporter en JSON')
-                    ->icon('tabler-file-code')
-                    ->color('success')
-                    ->action(fn () => $this->exportLogs('json')),
-                Action::make('export_csv')
-                    ->label('Exporter en CSV')
-                    ->icon('tabler-file-spreadsheet')
-                    ->color('success')
-                    ->action(fn () => $this->exportLogs('csv')),
-                Action::make('export_txt')
-                    ->label('Exporter en TXT')
-                    ->icon('tabler-file-text')
-                    ->color('success')
-                    ->action(fn () => $this->exportLogs('txt')),
-            ])
-                ->label('Actions')
-                ->icon('tabler-dots-vertical')
-                ->color('gray'),
-        ];
-    }
+            Action::make('clear_logs')
+                ->label('Vider tous les logs')
+                ->icon('tabler-trash')
+                ->color('danger')
+                ->action(fn () => $this->clearLogs())
+                ->requiresConfirmation()
+                ->modalHeading('Vider tous les logs')
+                ->modalDescription('Êtes-vous sûr de vouloir supprimer toutes les erreurs de ce serveur ? Cette action est irréversible.')
+                ->modalSubmitActionLabel('Vider'),
 
-    /**
-     * Affiche une erreur
-     */
-    public function viewError(LuaError $record): void
-    {
-        Log::info('LuaErrorLogger: Viewing error', [
-            'error_id' => $record->id,
-            'message' => $record->message
-        ]);
+            Action::make('export_logs')
+                ->label('Exporter')
+                ->icon('tabler-download')
+                ->color('success')
+                ->action(fn () => $this->exportLogs()),
+        ];
     }
 }
