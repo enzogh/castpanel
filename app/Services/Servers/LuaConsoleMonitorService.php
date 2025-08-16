@@ -73,6 +73,13 @@ class LuaConsoleMonitorService
             $daemonUrl = $this->getDaemonUrl($server);
             $token = $this->getDaemonToken($server);
             
+            Log::info('LuaConsoleMonitor: Attempting to get console output', [
+                'server_id' => $server->id,
+                'server_uuid' => $server->uuid,
+                'daemon_url' => $daemonUrl,
+                'has_token' => !empty($token)
+            ]);
+            
             if (empty($token)) {
                 Log::warning('LuaConsoleMonitor: No daemon token available', [
                     'server_id' => $server->id
@@ -80,29 +87,60 @@ class LuaConsoleMonitorService
                 return '';
             }
             
+            $fullUrl = $daemonUrl . '/api/servers/' . $server->uuid . '/logs';
+            Log::info('LuaConsoleMonitor: Making request to daemon', [
+                'server_id' => $server->id,
+                'full_url' => $fullUrl
+            ]);
+            
             $response = Http::timeout(10)
                 ->withHeaders([
                     'Authorization' => 'Bearer ' . $token,
                     'Accept' => 'application/json',
                 ])
-                ->get($daemonUrl . '/api/servers/' . $server->id . '/logs');
+                ->get($fullUrl);
+
+            Log::info('LuaConsoleMonitor: Daemon response received', [
+                'server_id' => $server->id,
+                'status' => $response->status(),
+                'headers' => $response->headers(),
+                'body_length' => strlen($response->body())
+            ]);
 
             if ($response->successful()) {
                 $data = $response->json();
                 $consoleData = $data['data'] ?? '';
+                
+                Log::info('LuaConsoleMonitor: Console data extracted', [
+                    'server_id' => $server->id,
+                    'data_type' => gettype($data),
+                    'console_data_type' => gettype($consoleData),
+                    'console_data_length' => is_string($consoleData) ? strlen($consoleData) : (is_array($consoleData) ? count($consoleData) : 'N/A'),
+                    'data_keys' => is_array($data) ? array_keys($data) : 'N/A'
+                ]);
                 
                 // S'assurer que c'est une chaîne
                 if (is_array($consoleData)) {
                     $consoleData = implode("\n", $consoleData);
                 }
                 
-                return is_string($consoleData) ? $consoleData : '';
+                $finalOutput = is_string($consoleData) ? $consoleData : '';
+                
+                Log::info('LuaConsoleMonitor: Final console output', [
+                    'server_id' => $server->id,
+                    'final_output_length' => strlen($finalOutput),
+                    'final_output_preview' => substr($finalOutput, 0, 200)
+                ]);
+                
+                return $finalOutput;
             }
 
             Log::warning('LuaConsoleMonitor: Daemon response not successful', [
                 'server_id' => $server->id,
                 'status' => $response->status(),
-                'body' => substr($response->body(), 0, 200)
+                'body' => substr($response->body(), 0, 200),
+                'full_url' => $fullUrl,
+                'headers' => $response->headers()
             ]);
 
             return '';
