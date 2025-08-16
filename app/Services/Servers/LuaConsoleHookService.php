@@ -25,12 +25,27 @@ class LuaConsoleHookService
     /**
      * @var int
      */
-    private int $checkInterval = 5; // secondes
+    private int $checkInterval = 1; // secondes - plus rapide pour le streaming
 
     /**
      * @var int
      */
     private int $maxRetries = 3;
+
+    /**
+     * @var array
+     */
+    private array $consoleHistory = [];
+
+    /**
+     * @var array
+     */
+    private array $lastLineCounts = [];
+
+    /**
+     * @var bool
+     */
+    private bool $streamingMode = false;
 
     /**
      * @var bool
@@ -96,6 +111,24 @@ class LuaConsoleHookService
     {
         $this->debugMode = true;
         Log::info('LuaConsoleHook: Test mode enabled with simulated servers');
+    }
+
+    /**
+     * Active le mode streaming live
+     */
+    public function enableStreamingMode(): void
+    {
+        $this->streamingMode = true;
+        $this->checkInterval = 0; // Pas de délai pour le streaming
+        Log::info('LuaConsoleHook: Streaming mode enabled');
+    }
+
+    /**
+     * Vérifie si le mode streaming est activé
+     */
+    public function isStreamingMode(): bool
+    {
+        return $this->streamingMode;
     }
 
     /**
@@ -192,24 +225,33 @@ class LuaConsoleHookService
 
         while ($this->isRunning) {
             try {
-                if ($this->debugMode) {
-                    echo "🔍 Checking all servers... (Interval: {$this->checkInterval}s)\n";
+                if ($this->streamingMode) {
+                    // Mode streaming : pas de délai, affichage continu
+                    $this->checkAllServers();
+                    usleep(100000); // 0.1 seconde pour éviter de surcharger le CPU
+                } else {
+                    // Mode normal avec délai
+                    if ($this->debugMode) {
+                        echo "🔍 Checking all servers... (Interval: {$this->checkInterval}s)\n";
+                    }
+                    
+                    $this->checkAllServers();
+                    
+                    if ($this->debugMode) {
+                        echo "⏳ Waiting {$this->checkInterval} seconds before next check...\n";
+                    }
+                    
+                    sleep($this->checkInterval);
                 }
-                
-                $this->checkAllServers();
-                
-                if ($this->debugMode) {
-                    echo "⏳ Waiting {$this->checkInterval} seconds before next check...\n";
-                }
-                
-                sleep($this->checkInterval);
             } catch (\Exception $e) {
                 Log::error('LuaConsoleHook: Error in monitoring loop', [
                     'error' => $e->getMessage()
                 ]);
                 
                 // Continuer malgré l'erreur
-                sleep($this->checkInterval);
+                if (!$this->streamingMode) {
+                    sleep($this->checkInterval);
+                }
             }
         }
     }
@@ -243,17 +285,47 @@ class LuaConsoleHookService
                 return;
             }
 
-            // En mode debug, afficher toutes les lignes de la console
-            if ($this->debugMode) {
-                $lines = explode("\n", $consoleOutput);
-                foreach ($lines as $lineNumber => $line) {
+            $serverId = $server->id;
+            $lines = explode("\n", $consoleOutput);
+            $currentLineCount = count($lines);
+            
+            // Initialiser l'historique si c'est la première fois
+            if (!isset($this->lastLineCounts[$serverId])) {
+                $this->lastLineCounts[$serverId] = 0;
+                $this->consoleHistory[$serverId] = [];
+            }
+
+            // En mode streaming, afficher seulement les nouvelles lignes
+            if ($this->streamingMode || $this->debugMode) {
+                $newLines = array_slice($lines, $this->lastLineCounts[$serverId]);
+                
+                foreach ($newLines as $lineNumber => $line) {
                     $line = trim($line);
                     if (!empty($line)) {
+                        $absoluteLineNumber = $this->lastLineCounts[$serverId] + $lineNumber + 1;
                         $isError = $this->isLuaError($line);
                         $status = $isError ? '🚨 ERROR' : '📝 INFO';
-                        echo "[{$status}] Server {$server->name} (ID: {$server->id}) - Line " . ($lineNumber + 1) . ": {$line}\n";
+                        $timestamp = date('H:i:s');
+                        
+                        // Affichage en streaming live
+                        if ($this->streamingMode) {
+                            echo "[{$timestamp}] [{$status}] {$server->name}: {$line}\n";
+                        } else {
+                            echo "[{$status}] Server {$server->name} (ID: {$serverId}) - Line {$absoluteLineNumber}: {$line}\n";
+                        }
+                        
+                        // Stocker dans l'historique
+                        $this->consoleHistory[$serverId][] = [
+                            'timestamp' => $timestamp,
+                            'line' => $line,
+                            'is_error' => $isError,
+                            'line_number' => $absoluteLineNumber
+                        ];
                     }
                 }
+                
+                // Mettre à jour le compteur de lignes
+                $this->lastLineCounts[$serverId] = $currentLineCount;
             }
 
             // Parser pour détecter les erreurs Lua
@@ -584,13 +656,47 @@ class LuaConsoleHookService
      */
     public function getStats(): array
     {
+        $totalLines = 0;
+        $totalErrors = 0;
+        
+        foreach ($this->consoleHistory as $serverHistory) {
+            $totalLines += count($serverHistory);
+            foreach ($serverHistory as $entry) {
+                if ($entry['is_error']) {
+                    $totalErrors++;
+                }
+            }
+        }
+
         return [
             'is_running' => $this->isRunning,
+            'streaming_mode' => $this->streamingMode,
             'monitored_servers' => count($this->monitoredServers),
             'check_interval' => $this->checkInterval,
-            'last_check' => Cache::get('lua_hook_last_check'),
-            'errors_detected_today' => 0 // En mode test, pas de base de données
+            'total_lines_streamed' => $totalLines,
+            'total_errors_detected' => $totalErrors,
+            'console_history' => $this->consoleHistory
         ];
+    }
+
+    /**
+     * Obtient l'historique de la console pour un serveur
+     */
+    public function getConsoleHistory(int $serverId): array
+    {
+        return $this->consoleHistory[$serverId] ?? [];
+    }
+
+    /**
+     * Efface l'historique de la console
+     */
+    public function clearConsoleHistory(): void
+    {
+        $this->consoleHistory = [];
+        $this->lastLineCounts = [];
+        if ($this->debugMode) {
+            echo "🗑️  Console history cleared\n";
+        }
     }
 
     /**
@@ -654,32 +760,66 @@ class LuaConsoleHookService
      */
     private function getTestConsoleOutput($server): string
     {
-        $testOutputs = [
-            "Server starting up...\n" .
-            "Loading addons...\n" .
-            "[ERROR] Lua script failed to load: addon 'test_addon' not found\n" .
-            "Addon loaded successfully\n" .
-            "Server ready for connections\n" .
-            "[ERROR] Attempt to call nil value in function 'player_connect'\n" .
-            "Player connected: TestPlayer\n" .
-            "[ERROR] Bad argument #1 to 'print' (string expected, got nil)\n" .
-            "Map loaded: gm_construct\n" .
-            "Gamemode initialized\n",
+        static $lineCounters = [];
+        static $lastUpdate = [];
+        
+        $serverId = $server->id;
+        
+        // Initialiser les compteurs
+        if (!isset($lineCounters[$serverId])) {
+            $lineCounters[$serverId] = 0;
+            $lastUpdate[$serverId] = time();
+        }
 
-            "Initializing Source Engine server...\n" .
-            "Loading game files...\n" .
-            "Server configuration loaded\n" .
-            "[ERROR] Failed to load map 'de_dust2'\n" .
-            "Map loaded successfully\n" .
-            "Bot AI initialized\n" .
-            "[ERROR] Memory allocation failed for texture loading\n" .
-            "Server ready\n" .
-            "Player joined: CounterTerrorist\n" .
-            "Round started\n"
+        // En mode streaming, générer de nouvelles lignes progressivement
+        if ($this->streamingMode) {
+            $currentTime = time();
+            $timeDiff = $currentTime - $lastUpdate[$serverId];
+            
+            // Générer 1-3 nouvelles lignes toutes les secondes
+            if ($timeDiff >= 1) {
+                $newLines = rand(1, 3);
+                $lineCounters[$serverId] += $newLines;
+                $lastUpdate[$serverId] = $currentTime;
+            }
+        } else {
+            // Mode normal : retourner toutes les lignes
+            $lineCounters[$serverId] = 10;
+        }
+
+        // Lignes de base pour chaque serveur
+        $baseLines = [
+            "Server starting up...",
+            "Loading addons...",
+            "[ERROR] Lua script failed to load: addon 'test_addon' not found",
+            "Addon loaded successfully",
+            "Server ready for connections",
+            "[ERROR] Attempt to call nil value in function 'player_connect'",
+            "Player connected: TestPlayer",
+            "[ERROR] Bad argument #1 to 'print' (string expected, got nil)",
+            "Map loaded: gm_construct",
+            "Gamemode initialized"
         ];
 
-        // Retourner des données différentes selon l'ID du serveur
-        $index = ($server->id - 1) % count($testOutputs);
-        return $testOutputs[$index];
+        $baseLines2 = [
+            "Initializing Source Engine server...",
+            "Loading game files...",
+            "Server configuration loaded",
+            "[ERROR] Failed to load map 'de_dust2'",
+            "Map loaded successfully",
+            "Bot AI initialized",
+            "[ERROR] Memory allocation failed for texture loading",
+            "Server ready",
+            "Player joined: CounterTerrorist",
+            "Round started"
+        ];
+
+        // Choisir les lignes selon le serveur
+        $lines = ($server->id == 1) ? $baseLines : $baseLines2;
+        
+        // Retourner seulement le nombre de lignes demandées
+        $linesToShow = array_slice($lines, 0, $lineCounters[$serverId]);
+        
+        return implode("\n", $linesToShow) . "\n";
     }
 }

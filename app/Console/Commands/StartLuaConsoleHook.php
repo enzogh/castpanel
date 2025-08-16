@@ -13,7 +13,7 @@ class StartLuaConsoleHook extends Command
      *
      * @var string
      */
-    protected $signature = 'lua:hook-console {--daemon : Run as daemon process} {--stop : Stop running hook} {--debug : Enable debug mode to see all console lines}';
+    protected $signature = 'lua:hook-console {--daemon : Run as daemon process} {--stop : Stop running hook} {--debug : Enable debug mode to see all console lines} {--stream : Enable live streaming mode for real-time console output}';
 
     /**
      * The console command description.
@@ -42,6 +42,12 @@ class StartLuaConsoleHook extends Command
             if ($this->option('debug')) {
                 $hookService->setDebugMode(true);
                 $this->info('🐛 Debug mode enabled - All console lines will be displayed');
+            }
+
+            // Activer le mode streaming si l'option est spécifiée
+            if ($this->option('stream')) {
+                $hookService->enableStreamingMode();
+                $this->info('📡 Live streaming mode enabled - Real-time console output');
             }
             
             if ($hookService->isRunning()) {
