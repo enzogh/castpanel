@@ -23,6 +23,9 @@ class LuaErrorLogger extends Page
     public string $search = '';
     public string $levelFilter = 'all';
     public string $timeFilter = 'all';
+    public int $pollingInterval = 5; // 5 secondes au lieu de 30
+    public bool $isMonitoring = false;
+    public ?string $lastConsoleCheck = null;
 
     protected ?LuaLogService $luaLogService = null;
 
@@ -216,14 +219,25 @@ class LuaErrorLogger extends Page
      */
     public function startConsoleMonitoring(): void
     {
+        if ($this->logsPaused) {
+            Log::info('Livewire: Console monitoring skipped - logs paused', [
+                'server_id' => $this->getServer()->id
+            ]);
+            return;
+        }
+
         try {
+            $this->isMonitoring = true;
+            $this->lastConsoleCheck = now()->toISOString();
+            
             $monitorService = app(LuaConsoleMonitorService::class);
             $newErrors = $monitorService->monitorConsole($this->getServer());
             
             if (is_array($newErrors) && count($newErrors) > 0) {
-                Log::info('Livewire: Console monitoring started, new errors found', [
+                Log::info('Livewire: Console monitoring completed, new errors found', [
                     'server_id' => $this->getServer()->id,
-                    'new_errors_count' => count($newErrors)
+                    'new_errors_count' => count($newErrors),
+                    'timestamp' => $this->lastConsoleCheck
                 ]);
                 
                 // Forcer le refresh de l'interface
@@ -232,7 +246,8 @@ class LuaErrorLogger extends Page
                 Log::info('Livewire: Console monitoring completed, no new errors', [
                     'server_id' => $this->getServer()->id,
                     'new_errors_type' => gettype($newErrors),
-                    'new_errors_count' => is_array($newErrors) ? count($newErrors) : 'not array'
+                    'new_errors_count' => is_array($newErrors) ? count($newErrors) : 'not array',
+                    'timestamp' => $this->lastConsoleCheck
                 ]);
             }
             
@@ -242,6 +257,8 @@ class LuaErrorLogger extends Page
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
+        } finally {
+            $this->isMonitoring = false;
         }
     }
 
@@ -297,6 +314,37 @@ class LuaErrorLogger extends Page
                 'error' => $e->getMessage()
             ]);
         }
+    }
+
+    /**
+     * Bascule la pause de la surveillance
+     */
+    public function togglePause(): void
+    {
+        $this->logsPaused = !$this->logsPaused;
+        
+        Log::info('Livewire: Toggle pause', [
+            'server_id' => $this->getServer()->id,
+            'logs_paused' => $this->logsPaused
+        ]);
+        
+        // Forcer le refresh de l'interface
+        $this->dispatch('$refresh');
+    }
+
+    /**
+     * Ajuste l'intervalle de polling
+     */
+    public function setPollingInterval(int $interval): void
+    {
+        $this->pollingInterval = max(1, min(60, $interval)); // Entre 1 et 60 secondes
+        
+        Log::info('Livewire: Polling interval updated', [
+            'server_id' => $this->getServer()->id,
+            'new_interval' => $this->pollingInterval
+        ]);
+        
+        $this->dispatch('$refresh');
     }
 
     protected function getHeaderActions(): array

@@ -74,7 +74,7 @@
             @endphp
             
             <!-- Surveillance automatique de la console -->
-            <div wire:poll.30s="monitorConsole" class="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
+            <div @if(!$logsPaused) wire:poll.{{ $pollingInterval }}s="monitorConsole" @endif class="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center">
                         <svg class="w-2 h-2 text-blue-600 dark:text-blue-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -84,8 +84,13 @@
                             <h3 class="text-sm font-medium text-blue-800 dark:text-blue-200">Surveillance de la console</h3>
                             <p class="text-xs text-blue-600 dark:text-blue-400">
                                 <span class="inline-flex items-center">
-                                    <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse mr-2"></span>
-                                    Surveillance active - Capture automatique des erreurs Lua [ERROR] 
+                                    @if($logsPaused)
+                                        <span class="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
+                                        Surveillance en pause - Capture automatique des erreurs Lua [ERROR] 
+                                    @else
+                                        <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse mr-2"></span>
+                                        Surveillance active - Capture automatique des erreurs Lua [ERROR] 
+                                    @endif
                                     @if(isset($logs) && is_array($logs))
                                         ({{ count($logs) }} erreur(s) ouverte(s))
                                     @else
@@ -94,7 +99,17 @@
                                 </span>
                             </p>
                             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                Dernière vérification : {{ now()->format('H:i:s') }} | Polling toutes les 30 secondes
+                                @if($logsPaused)
+                                    Surveillance en pause | Cliquez sur "Reprendre" pour relancer
+                                @else
+                                    @if($lastConsoleCheck)
+                                        Dernière vérification : {{ \Carbon\Carbon::parse($lastConsoleCheck)->format('H:i:s') }} | 
+                                    @endif
+                                    Polling toutes les {{ $pollingInterval }} secondes
+                                    @if($isMonitoring)
+                                        <span class="text-blue-600 dark:text-blue-400">• Surveillance en cours...</span>
+                                    @endif
+                                @endif
                             </p>
                         </div>
                     </div>
@@ -114,6 +129,26 @@
                         </svg>
                         Surveiller
                     </button>
+                    
+                    <!-- Contrôles d'intervalle -->
+                    <div class="flex items-center space-x-1 ml-2">
+                        <span class="text-xs text-gray-600 dark:text-gray-400">Intervalle:</span>
+                        <button
+                            wire:click="setPollingInterval(1)"
+                            class="px-2 py-1 text-xs rounded {{ $pollingInterval === 1 ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300' : 'bg-gray-100 dark:bg-gray-900/20 text-gray-700 dark:text-gray-300' }}"
+                            title="1 seconde"
+                        >1s</button>
+                        <button
+                            wire:click="setPollingInterval(5)"
+                            class="px-2 py-1 text-xs rounded {{ $pollingInterval === 5 ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300' : 'bg-gray-100 dark:bg-gray-900/20 text-gray-700 dark:text-gray-300' }}"
+                            title="5 secondes"
+                        >5s</button>
+                        <button
+                            wire:click="setPollingInterval(10)"
+                            class="px-2 py-1 text-xs rounded {{ $pollingInterval === 10 ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300' : 'bg-gray-100 dark:bg-gray-900/20 text-gray-700 dark:text-gray-300' }}"
+                            title="10 secondes"
+                        >10s</button>
+                    </div>
                 </div>
             </div>
             
