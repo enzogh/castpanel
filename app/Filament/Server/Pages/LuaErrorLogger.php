@@ -127,10 +127,19 @@ class LuaErrorLogger extends Page implements HasTable
      */
     public function table(Table $table): Table
     {
+        // Debug: vérifier la requête
+        $query = LuaError::query()->where('server_id', $this->getServer()->id);
+        $count = $query->count();
+        
+        Log::info('LuaErrorLogger: Table configuration', [
+            'server_id' => $this->getServer()->id,
+            'query_count' => $count,
+            'query_sql' => $query->toSql(),
+            'query_bindings' => $query->getBindings()
+        ]);
+
         return $table
-            ->query(
-                LuaError::query()->where('server_id', $this->getServer()->id)
-            )
+            ->query($query)
             ->columns([
                 TextColumn::make('first_seen')
                     ->label('Première fois')
@@ -649,6 +658,15 @@ class LuaErrorLogger extends Page implements HasTable
     }
 
     /**
+     * Force le refresh du tableau
+     */
+    public function refreshTable(): void
+    {
+        $this->resetTable();
+        Log::info('LuaErrorLogger: Table refreshed');
+    }
+
+    /**
      * Méthode de test pour vérifier la base de données
      */
     public function testDatabase(): void
@@ -693,6 +711,9 @@ class LuaErrorLogger extends Page implements HasTable
                 'total_errors_in_table' => $allErrors->count(),
                 'sample_errors' => $sampleErrors->toArray()
             ]);
+            
+            // Forcer le refresh du tableau
+            $this->refreshTable();
             
         } catch (\Exception $e) {
             Log::error('Livewire: Database test failed', [
