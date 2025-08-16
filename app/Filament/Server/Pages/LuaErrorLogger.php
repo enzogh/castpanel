@@ -308,11 +308,17 @@ class LuaErrorLogger extends Page implements HasTable
                     'resolved_at' => now(),
                 ]);
                 
-                $this->notify('success', 'Erreur marquée comme résolue');
+                $this->dispatch('notify', [
+                    'status' => 'success',
+                    'message' => 'Erreur marquée comme résolue'
+                ]);
             }
         } catch (\Exception $e) {
             Log::error('Erreur lors de la résolution', ['error' => $e->getMessage()]);
-            $this->notify('danger', 'Erreur lors de la résolution');
+            $this->dispatch('notify', [
+                'status' => 'danger',
+                'message' => 'Erreur lors de la résolution'
+            ]);
         }
     }
 
@@ -329,11 +335,17 @@ class LuaErrorLogger extends Page implements HasTable
                     'resolved_at' => null,
                 ]);
                 
-                $this->notify('success', 'Erreur rouverte');
+                $this->dispatch('notify', [
+                    'status' => 'success',
+                    'message' => 'Erreur rouverte'
+                ]);
             }
         } catch (\Exception $e) {
             Log::error('Erreur lors de la réouverture', ['error' => $e->getMessage()]);
-            $this->notify('danger', 'Erreur lors de la réouverture');
+            $this->dispatch('notify', [
+                'status' => 'danger',
+                'message' => 'Erreur lors de la réouverture'
+            ]);
         }
     }
 
@@ -346,11 +358,17 @@ class LuaErrorLogger extends Page implements HasTable
             $error = LuaError::where('error_key', $errorKey)->first();
             if ($error) {
                 $error->delete();
-                $this->notify('success', 'Erreur supprimée');
+                $this->dispatch('notify', [
+                    'status' => 'success',
+                    'message' => 'Erreur supprimée'
+                ]);
             }
         } catch (\Exception $e) {
             Log::error('Erreur lors de la suppression', ['error' => $e->getMessage()]);
-            $this->notify('danger', 'Erreur lors de la suppression');
+            $this->dispatch('notify', [
+                'status' => 'danger',
+                'message' => 'Erreur lors de la suppression'
+            ]);
         }
     }
 
@@ -363,10 +381,16 @@ class LuaErrorLogger extends Page implements HasTable
             $serverId = $this->getServer()->id;
             $deleted = LuaError::where('server_id', $serverId)->delete();
             
-            $this->notify('success', "{$deleted} erreurs supprimées");
+            $this->dispatch('notify', [
+                'status' => 'success',
+                'message' => "{$deleted} erreurs supprimées"
+            ]);
         } catch (\Exception $e) {
             Log::error('Erreur lors du nettoyage', ['error' => $e->getMessage()]);
-            $this->notify('danger', 'Erreur lors du nettoyage');
+            $this->dispatch('notify', [
+                'status' => 'danger',
+                'message' => 'Erreur lors du nettoyage'
+            ]);
         }
     }
 
@@ -402,10 +426,16 @@ class LuaErrorLogger extends Page implements HasTable
                 'mime' => 'text/csv'
             ]);
 
-            $this->notify('success', 'Export terminé');
+            $this->dispatch('notify', [
+                'status' => 'success',
+                'message' => 'Export terminé'
+            ]);
         } catch (\Exception $e) {
             Log::error('Erreur lors de l\'export', ['error' => $e->getMessage()]);
-            $this->notify('danger', 'Erreur lors de l\'export');
+            $this->dispatch('notify', [
+                'status' => 'danger',
+                'message' => 'Erreur lors de l\'export'
+            ]);
         }
     }
 
