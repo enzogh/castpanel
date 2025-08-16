@@ -164,7 +164,7 @@ class LuaErrorLogger extends Page implements HasTable
             ]);
         }
 
-        // Tableau très simple pour diagnostic
+        // Tableau ultra-simple pour diagnostic
         return $table
             ->query(LuaError::query()->where('server_id', $serverId))
             ->columns([
@@ -176,6 +176,10 @@ class LuaErrorLogger extends Page implements HasTable
                     ->label('Message')
                     ->limit(100)
                     ->grow(),
+
+                TextColumn::make('resolved')
+                    ->label('Statut')
+                    ->grow(false),
             ])
             ->actions([
                 TableAction::make('view')
@@ -185,6 +189,7 @@ class LuaErrorLogger extends Page implements HasTable
                         Log::info('View action clicked', [
                             'record_exists' => $record ? 'yes' : 'no',
                             'record_id' => $record ? $record->id : 'null',
+                            'record_resolved' => $record ? $record->resolved : 'null',
                             'record_data' => $record ? $record->toArray() : 'null'
                         ]);
                     }),
@@ -194,18 +199,14 @@ class LuaErrorLogger extends Page implements HasTable
                     ->icon('tabler-check')
                     ->color('success')
                     ->action(function ($record) {
+                        Log::info('Resolve action clicked', [
+                            'record_exists' => $record ? 'yes' : 'no',
+                            'record_id' => $record ? $record->id : 'null',
+                            'record_resolved' => $record ? $record->resolved : 'null'
+                        ]);
+                        
                         if ($record && $record->error_key) {
                             $this->markAsResolved($record->error_key);
-                        }
-                    }),
-
-                TableAction::make('delete')
-                    ->label('Supprimer')
-                    ->icon('tabler-trash')
-                    ->color('danger')
-                    ->action(function ($record) {
-                        if ($record && $record->error_key) {
-                            $this->deleteError($record->error_key);
                         }
                     }),
             ])
