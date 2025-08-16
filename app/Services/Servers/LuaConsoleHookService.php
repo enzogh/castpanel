@@ -381,7 +381,7 @@ class LuaConsoleHookService
     }
 
     /**
-     * Récupère la sortie de la console depuis le daemon
+     * Récupère le contenu des fichiers de logs depuis le daemon
      */
     private function getConsoleOutput($server): string
     {
@@ -398,9 +398,10 @@ class LuaConsoleHookService
                 return '';
             }
             
+            // Récupérer les logs depuis l'API du daemon
             $fullUrl = $daemonUrl . '/api/servers/' . $server->uuid . '/logs';
             
-            $response = Http::timeout(10)
+            $response = Http::timeout(30) // Timeout plus long pour les gros fichiers
                 ->withHeaders([
                     'Authorization' => 'Bearer ' . $token,
                     'Accept' => 'application/json',
@@ -409,13 +410,20 @@ class LuaConsoleHookService
 
             if ($response->successful()) {
                 $data = $response->json();
-                return $data['data'] ?? '';
+                $logs = $data['data'] ?? '';
+                
+                // Si c'est un fichier de log, essayer de le lire directement
+                if (empty($logs) && isset($data['file_path'])) {
+                    $logs = $this->readLogFileFromDaemon($server, $data['file_path']);
+                }
+                
+                return $logs;
             }
 
             return '';
 
         } catch (\Exception $e) {
-            Log::error('LuaConsoleHook: Failed to get console output', [
+            Log::error('LuaConsoleHook: Failed to get log files', [
                 'server_id' => $server->id,
                 'error' => $e->getMessage()
             ]);
@@ -424,15 +432,64 @@ class LuaConsoleHookService
     }
 
     /**
-     * Parse la sortie de la console pour détecter les erreurs Lua
+     * Lit un fichier de log directement depuis le daemon
+     */
+    private function readLogFileFromDaemon($server, string $filePath): string
+    {
+        try {
+            $daemonUrl = $this->getDaemonUrl($server);
+            $token = $this->getDaemonToken($server);
+            
+            if (empty($token)) {
+                return '';
+            }
+            
+            // Endpoint pour lire un fichier spécifique
+            $fullUrl = $daemonUrl . '/api/servers/' . $server->uuid . '/files/contents';
+            
+            $response = Http::timeout(60) // Timeout long pour les gros fichiers
+                ->withHeaders([
+                    'Authorization' => 'Bearer ' . $token,
+                    'Accept' => 'application/json',
+                ])
+                ->post($fullUrl, [
+                    'file' => $filePath,
+                    'start_line' => 0,
+                    'end_line' => 10000 // Lire jusqu'à 10k lignes
+                ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                return $data['contents'] ?? '';
+            }
+
+            return '';
+
+        } catch (\Exception $e) {
+            Log::error('LuaConsoleHook: Failed to read log file', [
+                'server_id' => $server->id,
+                'file_path' => $filePath,
+                'error' => $e->getMessage()
+            ]);
+            return '';
+        }
+    }
+
+    /**
+     * Parse le contenu des fichiers de logs pour détecter les erreurs Lua avec stack traces
      */
     private function parseConsoleForLuaErrors(string $consoleOutput): array
     {
         $errors = [];
         $lines = explode("\n", $consoleOutput);
+        $totalLines = count($lines);
         
-        foreach ($lines as $lineNumber => $line) {
-            $line = trim($line);
+        if ($this->debugMode) {
+            echo "📄 Analyzing log file with {$totalLines} lines...\n";
+        }
+        
+        for ($lineNumber = 0; $lineNumber < $totalLines; $lineNumber++) {
+            $line = trim($lines[$lineNumber]);
             
             if (empty($line)) {
                 continue;
@@ -440,13 +497,31 @@ class LuaConsoleHookService
 
             // Détecter les erreurs Lua communes
             if ($this->isLuaError($line)) {
+                // Capturer la stack trace complète après l'erreur
+                $stackTrace = $this->captureStackTrace($lines, $lineNumber, $totalLines);
+                $context = $this->captureErrorContext($lines, $lineNumber, $totalLines);
+                
+                // Essayer d'extraire un timestamp de la ligne
+                $timestamp = $this->extractTimestampFromLogLine($line);
+                
                 $errors[] = [
                     'line' => $lineNumber + 1,
                     'content' => $line,
                     'type' => $this->classifyLuaError($line),
-                    'timestamp' => now()
+                    'timestamp' => $timestamp ?? now(),
+                    'stack_trace' => $stackTrace,
+                    'context' => $context,
+                    'raw_line' => $lines[$lineNumber] // Ligne originale non trimmée
                 ];
+                
+                if ($this->debugMode) {
+                    echo "🚨 Error found at line {$lineNumber}: {$line}\n";
+                }
             }
+        }
+
+        if ($this->debugMode) {
+            echo "📊 Total errors found: " . count($errors) . "\n";
         }
 
         return $errors;
@@ -466,7 +541,18 @@ class LuaConsoleHookService
             '/stack overflow/i',
             '/memory error/i',
             '/syntax error/i',
-            '/runtime error/i'
+            '/runtime error/i',
+            '/failed to load/i',
+            '/could not load/i',
+            '/error loading/i',
+            '/addon.*not found/i',
+            '/script.*failed/i',
+            '/function.*error/i',
+            '/nil value/i',
+            '/invalid.*argument/i',
+            '/out of memory/i',
+            '/segmentation fault/i',
+            '/access violation/i'
         ];
 
         foreach ($errorPatterns as $pattern) {
@@ -519,6 +605,132 @@ class LuaConsoleHookService
     }
 
     /**
+     * Capture la stack trace complète après une erreur
+     */
+    private function captureStackTrace(array $lines, int $errorLineIndex, int $totalLines): string
+    {
+        $stackTrace = [];
+        $maxLines = 20; // Limiter à 20 lignes pour éviter d'être trop verbeux
+        
+        // Capturer les lignes après l'erreur (stack trace)
+        for ($i = $errorLineIndex + 1; $i < min($errorLineIndex + $maxLines, $totalLines); $i++) {
+            $line = trim($lines[$i]);
+            
+            if (empty($line)) {
+                continue;
+            }
+            
+            // Arrêter si on trouve une ligne qui indique la fin de la stack trace
+            if (preg_match('/^[a-zA-Z]/', $line) && !preg_match('/^\s*at\s+/', $line)) {
+                // Si c'est une nouvelle ligne qui ne ressemble pas à une stack trace
+                if (!preg_match('/error|exception|stack|trace/i', $line)) {
+                    break;
+                }
+            }
+            
+            $stackTrace[] = $line;
+        }
+        
+        return implode("\n", $stackTrace);
+    }
+
+    /**
+     * Capture le contexte autour de l'erreur
+     */
+    private function captureErrorContext(array $lines, int $errorLineIndex, int $totalLines): string
+    {
+        $context = [];
+        $contextLines = 5; // 5 lignes avant et après l'erreur
+        
+        // Lignes avant l'erreur
+        $start = max(0, $errorLineIndex - $contextLines);
+        for ($i = $start; $i < $errorLineIndex; $i++) {
+            $line = trim($lines[$i]);
+            if (!empty($line)) {
+                $context[] = "  {$line}";
+            }
+        }
+        
+        // Ligne d'erreur (marquée)
+        $context[] = "→ " . trim($lines[$errorLineIndex]);
+        
+        // Lignes après l'erreur
+        for ($i = $errorLineIndex + 1; $i < min($errorLineIndex + $contextLines + 1, $totalLines); $i++) {
+            $line = trim($lines[$i]);
+            if (!empty($line)) {
+                $context[] = "  {$line}";
+            }
+        }
+        
+        return implode("\n", $context);
+    }
+
+    /**
+     * Extrait le nom de l'addon depuis le message d'erreur
+     */
+    private function extractAddonFromError(string $errorMessage): ?string
+    {
+        // Patterns pour détecter les noms d'addons dans les erreurs
+        $addonPatterns = [
+            '/addon\s+[\'"]([^\'"]+)[\'"]/i',
+            '/workshop\s+addon\s+[\'"]([^\'"]+)[\'"]/i',
+            '/addon\s+([a-zA-Z0-9_-]+)/i',
+            '/script\s+[\'"]([^\'"]+\.lua)[\'"]/i',
+            '/file\s+[\'"]([^\'"]+\.lua)[\'"]/i'
+        ];
+        
+        foreach ($addonPatterns as $pattern) {
+            if (preg_match($pattern, $errorMessage, $matches)) {
+                return $matches[1];
+            }
+        }
+        
+        return null;
+    }
+
+    /**
+     * Extrait un timestamp depuis une ligne de log
+     */
+    private function extractTimestampFromLogLine(string $line): ?string
+    {
+        // Patterns courants pour les timestamps dans les logs
+        $timestampPatterns = [
+            // Format: [2024-01-15 14:30:25]
+            '/\[(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\]/',
+            // Format: 2024-01-15 14:30:25
+            '/(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})/',
+            // Format: [15/01/2024 14:30:25]
+            '/\[(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2}:\d{2})\]/',
+            // Format: [14:30:25]
+            '/\[(\d{2}:\d{2}:\d{2})\]/',
+            // Format: 14:30:25
+            '/(\d{2}:\d{2}:\d{2})/'
+        ];
+        
+        foreach ($timestampPatterns as $pattern) {
+            if (preg_match($pattern, $line, $matches)) {
+                $timestamp = $matches[1];
+                
+                // Convertir en format standard si nécessaire
+                if (preg_match('/^\d{2}:\d{2}:\d{2}$/', $timestamp)) {
+                    // Ajouter la date d'aujourd'hui
+                    $timestamp = date('Y-m-d') . ' ' . $timestamp;
+                } elseif (preg_match('/^\d{2}\/\d{2}\/\d{4}/', $timestamp)) {
+                    // Convertir DD/MM/YYYY en YYYY-MM-DD
+                    $timestamp = \DateTime::createFromFormat('d/m/Y H:i:s', $timestamp);
+                    if ($timestamp) {
+                        $timestamp = $timestamp->format('Y-m-d H:i:s');
+                    }
+                }
+                
+                return $timestamp;
+            }
+        }
+        
+        return null;
+    }
+
+    /**
      * Traite les nouvelles erreurs détectées
      */
     private function processNewErrors($server, array $errors): void
@@ -550,8 +762,8 @@ class LuaConsoleHookService
                     'error_key' => $errorKey,
                     'level' => 'ERROR',
                     'message' => $error['content'],
-                    'addon' => null, // À déterminer si possible
-                    'stack_trace' => null,
+                    'addon' => $this->extractAddonFromError($error['content']),
+                    'stack_trace' => $error['stack_trace'] ?? null,
                     'count' => 1,
                     'first_seen' => $error['timestamp'],
                     'last_seen' => $error['timestamp'],
@@ -632,17 +844,26 @@ class LuaConsoleHookService
                 echo "    DEBUG: Checking test server egg name: '{$eggName}'\n";
             }
             
-            $patterns = ['garry\'s mod', 'gmod', 'garrysmod'];
-            foreach ($patterns as $pattern) {
+            // Patterns plus stricts pour Garry's Mod uniquement
+            $gmodPatterns = [
+                'garry\'s mod',
+                'gmod',
+                'garrysmod',
+                'garry\'s mod server',
+                'gmod server'
+            ];
+            
+            foreach ($gmodPatterns as $pattern) {
                 if (Str::contains($eggName, $pattern)) {
                     if ($this->debugMode) {
-                        echo "    DEBUG: Test server matched pattern: '{$pattern}'\n";
+                        echo "    DEBUG: Test server matched GMod pattern: '{$pattern}'\n";
                     }
                     return true;
                 }
             }
+            
             if ($this->debugMode) {
-                echo "    DEBUG: Test server no pattern matched\n";
+                echo "    DEBUG: Test server no GMod pattern matched\n";
             }
             return false;
         }
@@ -668,12 +889,28 @@ class LuaConsoleHookService
             echo "    DEBUG: Checking egg name: '{$eggName}'\n";
         }
         
-        // En mode production, être strict
-        return Str::contains($eggName, [
+        // Patterns plus stricts pour Garry's Mod uniquement
+        $gmodPatterns = [
             'garry\'s mod',
             'gmod',
-            'garrysmod'
-        ]);
+            'garrysmod',
+            'garry\'s mod server',
+            'gmod server'
+        ];
+        
+        foreach ($gmodPatterns as $pattern) {
+            if (Str::contains($eggName, $pattern)) {
+                if ($this->debugMode) {
+                    echo "    DEBUG: Server matched GMod pattern: '{$pattern}'\n";
+                }
+                return true;
+            }
+        }
+        
+        if ($this->debugMode) {
+            echo "    DEBUG: Server no GMod pattern matched\n";
+        }
+        return false;
     }
 
     /**
@@ -872,44 +1109,64 @@ class LuaConsoleHookService
             $lineCounters[$serverId] = 10;
         }
 
-        // Lignes spécifiques à Garry's Mod pour chaque serveur
+        // Lignes spécifiques à Garry's Mod pour chaque serveur avec timestamps et stack traces
         $gmodLines1 = [
-            "Garry's Mod server starting up...",
-            "Loading Lua scripts and addons...",
-            "[ERROR] Lua script failed to load: addon 'wiremod' not found",
-            "Addon 'sandbox' loaded successfully",
-            "Gamemode 'sandbox' initialized",
-            "Server ready for connections",
-            "[ERROR] Attempt to call nil value in function 'player_initial_spawn'",
-            "Player connected: TestPlayer",
-            "[ERROR] Bad argument #1 to 'print' (string expected, got nil)",
-            "Map loaded: gm_construct"
+            "[2024-01-15 14:30:25] Garry's Mod server starting up...",
+            "[2024-01-15 14:30:26] Loading Lua scripts and addons...",
+            "[2024-01-15 14:30:26] [ERROR] Lua script failed to load: addon 'wiremod' not found",
+            "    at addon_loader.lua:45",
+            "    at workshop_manager.lua:123",
+            "    at server_init.lua:67",
+            "[2024-01-15 14:30:27] Addon 'sandbox' loaded successfully",
+            "[2024-01-15 14:30:28] Gamemode 'sandbox' initialized",
+            "[2024-01-15 14:30:29] Server ready for connections",
+            "[2024-01-15 14:30:30] [ERROR] Attempt to call nil value in function 'player_initial_spawn'",
+            "    at player_manager.lua:89",
+            "    at spawn_system.lua:156",
+            "    at gamemode.lua:34",
+            "[2024-01-15 14:30:31] Player connected: TestPlayer",
+            "[2024-01-15 14:30:32] [ERROR] Bad argument #1 to 'print' (string expected, got nil)",
+            "    at debug.lua:23",
+            "    at player_utils.lua:67",
+            "[2024-01-15 14:30:33] Map loaded: gm_construct"
         ];
 
         $gmodLines2 = [
-            "GMod server initializing...",
-            "Loading workshop content...",
-            "Server configuration loaded",
-            "[ERROR] Failed to load workshop addon '123456789'",
-            "Workshop addon loaded successfully",
-            "Lua environment initialized",
-            "[ERROR] Memory allocation failed for texture loading",
-            "Server ready for players",
-            "Player joined: Builder",
-            "Gamemode started"
+            "[2024-01-15 14:30:25] GMod server initializing...",
+            "[2024-01-15 14:30:26] Loading workshop content...",
+            "[2024-01-15 14:30:27] Server configuration loaded",
+            "[2024-01-15 14:30:27] [ERROR] Failed to load workshop addon '123456789'",
+            "    at workshop_loader.lua:78",
+            "    at content_manager.lua:145",
+            "    at startup.lua:56",
+            "[2024-01-15 14:30:28] Workshop addon loaded successfully",
+            "[2024-01-15 14:30:29] Lua environment initialized",
+            "[2024-01-15 14:30:30] [ERROR] Memory allocation failed for texture loading",
+            "    at texture_manager.lua:92",
+            "    at resource_loader.lua:178",
+            "    at graphics.lua:45",
+            "[2024-01-15 14:30:31] Server ready for players",
+            "[2024-01-15 14:30:32] Player joined: Builder",
+            "[2024-01-15 14:30:33] Gamemode started"
         ];
 
         $gmodLines3 = [
-            "GarrysMod server starting...",
-            "Loading custom Lua scripts...",
-            "Server settings applied",
-            "[ERROR] Lua script 'custom_script.lua' syntax error",
-            "Script loaded successfully",
-            "Physics engine initialized",
-            "[ERROR] Failed to load custom model",
-            "Server ready",
-            "Player connected: Developer",
-            "Custom gamemode loaded"
+            "[2024-01-15 14:30:25] GarrysMod server starting...",
+            "[2024-01-15 14:30:26] Loading custom Lua scripts...",
+            "[2024-01-15 14:30:27] Server settings applied",
+            "[2024-01-15 14:30:27] [ERROR] Lua script 'custom_script.lua' syntax error",
+            "    at lua_parser.lua:34",
+            "    at script_loader.lua:89",
+            "    at custom_loader.lua:123",
+            "[2024-01-15 14:30:28] Script loaded successfully",
+            "[2024-01-15 14:30:29] Physics engine initialized",
+            "[2024-01-15 14:30:30] [ERROR] Failed to load custom model",
+            "    at model_loader.lua:67",
+            "    at asset_manager.lua:134",
+            "    at resource_system.lua:78",
+            "[2024-01-15 14:30:31] Server ready",
+            "[2024-01-15 14:30:32] Player connected: Developer",
+            "[2024-01-15 14:30:33] Custom gamemode loaded"
         ];
 
         // Choisir les lignes selon l'ID du serveur
