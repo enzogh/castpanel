@@ -81,13 +81,12 @@ class LuaConsoleHookService
     private function loadServers(): void
     {
         try {
-            $servers = Server::with(['egg', 'node'])
-                ->where('installed', true)
-                ->where('suspended', false)
-                ->get();
+            // Charger tous les serveurs et filtrer avec les méthodes du modèle
+            $servers = Server::with(['egg', 'node'])->get();
 
             $this->monitoredServers = $servers->filter(function ($server) {
-                return $this->isGarrysModServer($server);
+                // Vérifier que le serveur est installé et non suspendu
+                return $server->isInstalled() && !$server->isSuspended() && $this->isGarrysModServer($server);
             })->values()->all();
 
             Log::info('LuaConsoleHook: Loaded servers for monitoring', [
