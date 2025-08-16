@@ -73,6 +73,17 @@
                         🔍 Test DB
                     </button>
                 </div>
+
+                <!-- Bouton pour afficher toutes les erreurs -->
+                <div>
+                    <button
+                        wire:click="showAllErrors"
+                        class="px-3 py-2 text-sm rounded-md bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800 transition-colors"
+                        title="Afficher toutes les erreurs (même résolues)"
+                    >
+                        📋 Toutes les erreurs
+                    </button>
+                </div>
             </div>
 
             <!-- Informations de debug -->
@@ -83,12 +94,20 @@
                     <div class="text-xs text-blue-700 dark:text-blue-300 space-y-1">
                         <p><strong>Server ID :</strong> {{ $debugInfo['server_id'] }}</p>
                         <p><strong>Erreurs pour ce serveur :</strong> {{ $debugInfo['total_errors_for_server'] }}</p>
+                        <p><strong>Erreurs résolues :</strong> {{ $debugInfo['resolved_errors'] }}</p>
+                        <p><strong>Erreurs non résolues :</strong> {{ $debugInfo['unresolved_errors'] }}</p>
+                        <p><strong>Erreurs sans statut :</strong> {{ $debugInfo['null_resolved_errors'] }}</p>
                         <p><strong>Total erreurs en base :</strong> {{ $debugInfo['total_errors_in_table'] }}</p>
                         @if($debugInfo['sample_errors'])
                             <p><strong>Exemples d'erreurs :</strong></p>
                             <ul class="ml-4 space-y-1">
                                 @foreach($debugInfo['sample_errors'] as $error)
-                                    <li>ID: {{ $error['id'] }} - {{ Str::limit($error['message'], 50) }}</li>
+                                    <li>
+                                        <strong>ID:</strong> {{ $error['id'] }} | 
+                                        <strong>Résolu:</strong> {{ $error['resolved'] ? 'Oui' : 'Non' }} | 
+                                        <strong>Status:</strong> {{ $error['status'] ?? 'N/A' }} | 
+                                        <strong>Message:</strong> {{ Str::limit($error['message'], 50) }}
+                                    </li>
                                 @endforeach
                             </ul>
                         @endif

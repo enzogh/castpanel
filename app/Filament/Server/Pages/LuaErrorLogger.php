@@ -82,11 +82,18 @@ class LuaErrorLogger extends Page
             // Debug: afficher l'ID du serveur
             Log::info('Livewire: Getting logs for server', ['server_id' => $serverId]);
             
+            // Requête de base
             $query = LuaError::where('server_id', $serverId);
 
             // Debug: compter le total avant filtres
             $totalBeforeFilters = $query->count();
             Log::info('Livewire: Total errors before filters', ['count' => $totalBeforeFilters]);
+
+            // Si pas d'erreurs, retourner vide
+            if ($totalBeforeFilters === 0) {
+                Log::warning('Livewire: No errors found for server', ['server_id' => $serverId]);
+                return [];
+            }
 
             // Filtre de recherche
             if (!empty($this->search)) {
@@ -114,10 +121,19 @@ class LuaErrorLogger extends Page
                 }
             }
 
-            // Filtre des erreurs résolues
+            // Filtre des erreurs résolues - IMPORTANT: par défaut on affiche TOUTES les erreurs
             if (!$this->showResolved) {
-                $query->where('resolved', false);
+                // On affiche les erreurs non résolues ET les erreurs sans statut résolu
+                $query->where(function($q) {
+                    $q->where('resolved', false)
+                      ->orWhereNull('resolved');
+                });
             }
+
+            // Debug: afficher la requête SQL
+            $sql = $query->toSql();
+            $bindings = $query->getBindings();
+            Log::info('Livewire: SQL query', ['sql' => $sql, 'bindings' => $bindings]);
 
             $logs = $query->orderBy('first_seen', 'desc')->get()->toArray();
 
@@ -132,7 +148,9 @@ class LuaErrorLogger extends Page
                     'level' => $this->levelFilter,
                     'time' => $this->timeFilter
                 ],
-                'first_log' => $logs[0] ?? 'no logs'
+                'first_log' => $logs[0] ?? 'no logs',
+                'sql_query' => $sql,
+                'sql_bindings' => $bindings
             ]);
 
             return $logs;
@@ -323,6 +341,23 @@ class LuaErrorLogger extends Page
     }
 
     /**
+     * Force l'affichage de toutes les erreurs (même résolues)
+     */
+    public function showAllErrors(): void
+    {
+        $this->showResolved = true;
+        $this->search = '';
+        $this->levelFilter = 'all';
+        $this->timeFilter = 'all';
+        
+        Log::info('Livewire: Showing all errors', [
+            'server_id' => $this->getServer()->id
+        ]);
+        
+        $this->dispatch('$refresh');
+    }
+
+    /**
      * Convertit les logs en CSV
      */
     private function toCsv(array $logs): string
@@ -382,14 +417,22 @@ class LuaErrorLogger extends Page
             // Vérifier quelques erreurs
             $sampleErrors = LuaError::where('server_id', $serverId)
                 ->limit(5)
-                ->get(['id', 'message', 'addon', 'first_seen', 'resolved']);
+                ->get(['id', 'message', 'addon', 'first_seen', 'resolved', 'status']);
             
             // Vérifier toutes les erreurs (sans filtres)
-            $allErrors = LuaError::all(['id', 'server_id', 'message']);
+            $allErrors = LuaError::all(['id', 'server_id', 'message', 'resolved', 'status']);
+            
+            // Vérifier les erreurs résolues vs non résolues
+            $resolvedErrors = LuaError::where('server_id', $serverId)->where('resolved', true)->count();
+            $unresolvedErrors = LuaError::where('server_id', $serverId)->where('resolved', false)->count();
+            $nullResolvedErrors = LuaError::where('server_id', $serverId)->whereNull('resolved')->count();
             
             Log::info('Livewire: Database test results', [
                 'server_id' => $serverId,
                 'total_errors_for_server' => $totalErrors,
+                'resolved_errors' => $resolvedErrors,
+                'unresolved_errors' => $unresolvedErrors,
+                'null_resolved_errors' => $nullResolvedErrors,
                 'sample_errors' => $sampleErrors->toArray(),
                 'total_errors_in_table' => $allErrors->count(),
                 'all_errors_server_ids' => $allErrors->pluck('server_id')->unique()->toArray()
@@ -399,6 +442,9 @@ class LuaErrorLogger extends Page
             session()->flash('debug_info', [
                 'server_id' => $serverId,
                 'total_errors_for_server' => $totalErrors,
+                'resolved_errors' => $resolvedErrors,
+                'unresolved_errors' => $unresolvedErrors,
+                'null_resolved_errors' => $nullResolvedErrors,
                 'total_errors_in_table' => $allErrors->count(),
                 'sample_errors' => $sampleErrors->toArray()
             ]);
