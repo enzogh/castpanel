@@ -128,19 +128,39 @@ class LuaErrorLogger extends Page implements HasTable
     public function table(Table $table): Table
     {
         // Debug: vérifier la requête
-        $query = LuaError::query()->where('server_id', $this->getServer()->id);
+        $serverId = $this->getServer()->id;
+        $query = LuaError::query()->where('server_id', $serverId);
         $count = $query->count();
         
         Log::info('LuaErrorLogger: Table configuration', [
-            'server_id' => $this->getServer()->id,
+            'server_id' => $serverId,
             'query_count' => $count,
             'query_sql' => $query->toSql(),
             'query_bindings' => $query->getBindings()
         ]);
 
+        // Vérifier si on a des erreurs
+        if ($count === 0) {
+            Log::warning('LuaErrorLogger: No errors found for server', [
+                'server_id' => $serverId
+            ]);
+        } else {
+            // Afficher quelques erreurs pour debug
+            $sampleErrors = $query->limit(3)->get(['id', 'message', 'level']);
+            Log::info('LuaErrorLogger: Sample errors found', [
+                'sample_errors' => $sampleErrors->toArray()
+            ]);
+        }
+
         return $table
             ->query($query)
             ->columns([
+                TextColumn::make('id')
+                    ->label('ID')
+                    ->sortable()
+                    ->grow(false)
+                    ->icon('tabler-hash'),
+
                 TextColumn::make('first_seen')
                     ->label('Première fois')
                     ->dateTime('d/m/Y H:i:s')
@@ -165,32 +185,32 @@ class LuaErrorLogger extends Page implements HasTable
                     ->searchable()
                     ->description(fn (LuaError $record) => $record->stack_trace ? 'Stack trace disponible' : null)
                     ->icon('tabler-alert-circle'),
+
+                TextColumn::make('resolved')
+                    ->label('Statut')
+                    ->badge()
+                    ->color(fn (bool $state) => $state ? 'success' : 'warning')
+                    ->label(fn (bool $state) => $state ? 'Résolu' : 'Ouvert')
+                    ->grow(false),
             ])
             ->filters([
                 SelectFilter::make('level')
                     ->label('Niveau')
                     ->options([
-                        'all' => 'Tous les niveaux',
                         'ERROR' => 'Erreur',
                         'WARNING' => 'Avertissement',
                         'INFO' => 'Information'
-                    ])
-                    ->query(function ($query, array $data) {
-                        if ($data['value'] !== 'all') {
-                            $query->where('level', $data['value']);
-                        }
-                    }),
+                    ]),
 
                 SelectFilter::make('resolved')
                     ->label('Statut')
                     ->options([
-                        'false' => 'Non résolues',
-                        'true' => 'Résolues',
-                        'all' => 'Toutes'
+                        '0' => 'Non résolues',
+                        '1' => 'Résolues'
                     ])
                     ->query(function ($query, array $data) {
-                        if ($data['value'] !== 'all') {
-                            $query->where('resolved', $data['value'] === 'true');
+                        if (isset($data['value'])) {
+                            $query->where('resolved', $data['value'] === '1');
                         }
                     }),
 
@@ -198,39 +218,11 @@ class LuaErrorLogger extends Page implements HasTable
                     ->form([
                         TextInput::make('search')
                             ->label('Rechercher')
-                            ->placeholder('Rechercher dans les messages ou addons...')
+                            ->placeholder('Rechercher dans les messages...')
                     ])
                     ->query(function ($query, array $data) {
                         if (!empty($data['search'])) {
-                            $query->where(function($q) use ($data) {
-                                $q->where('message', 'like', '%' . $data['search'] . '%')
-                                  ->orWhere('addon', 'like', '%' . $data['search'] . '%');
-                            });
-                        }
-                    }),
-
-                Filter::make('time')
-                    ->form([
-                        Select::make('time_filter')
-                            ->label('Période')
-                            ->options([
-                                'all' => 'Toute la période',
-                                'today' => 'Aujourd\'hui',
-                                'week' => 'Cette semaine',
-                                'month' => 'Ce mois'
-                            ])
-                    ])
-                    ->query(function ($query, array $data) {
-                        if ($data['time_filter'] !== 'all') {
-                            $timeRanges = [
-                                'today' => now()->startOfDay(),
-                                'week' => now()->subWeek(),
-                                'month' => now()->subMonth(),
-                            ];
-                            
-                            if (isset($timeRanges[$data['time_filter']])) {
-                                $query->where('first_seen', '>=', $timeRanges[$data['time_filter']]);
-                            }
+                            $query->where('message', 'like', '%' . $data['search'] . '%');
                         }
                     }),
             ])
@@ -607,8 +599,45 @@ class LuaErrorLogger extends Page implements HasTable
             'server_id' => $this->getServer()->id
         ]);
         
-        // Recharger les logs avec tous les filtres désactivés
-        $this->loadLogs();
+        // Forcer le refresh du tableau
+        $this->refreshTable();
+    }
+
+    /**
+     * Affiche les erreurs sans filtres
+     */
+    public function showErrorsWithoutFilters(): void
+    {
+        try {
+            $serverId = $this->getServer()->id;
+            
+            // Récupérer toutes les erreurs sans filtres
+            $allErrors = LuaError::where('server_id', $serverId)->get();
+            
+            Log::info('Livewire: Showing errors without filters', [
+                'server_id' => $serverId,
+                'total_errors' => $allErrors->count(),
+                'errors' => $allErrors->toArray()
+            ]);
+            
+            // Afficher dans la session pour debug
+            session()->flash('debug_info', [
+                'server_id' => $serverId,
+                'total_errors_for_server' => $allErrors->count(),
+                'errors_without_filters' => $allErrors->toArray()
+            ]);
+            
+            // Forcer le refresh du tableau
+            $this->refreshTable();
+            
+        } catch (\Exception $e) {
+            Log::error('Livewire: Failed to show errors without filters', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            session()->flash('debug_error', $e->getMessage());
+        }
     }
 
     /**
