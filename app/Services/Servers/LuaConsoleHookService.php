@@ -33,6 +33,11 @@ class LuaConsoleHookService
     private int $maxRetries = 3;
 
     /**
+     * @var bool
+     */
+    private bool $debugMode = false;
+
+    /**
      * Démarre le service de surveillance en temps réel
      */
     public function startHooking(): void
@@ -76,6 +81,23 @@ class LuaConsoleHookService
     }
 
     /**
+     * Active ou désactive le mode debug
+     */
+    public function setDebugMode(bool $enabled): void
+    {
+        $this->debugMode = $enabled;
+        Log::info('LuaConsoleHook: Debug mode ' . ($enabled ? 'enabled' : 'disabled'));
+    }
+
+    /**
+     * Vérifie si le mode debug est activé
+     */
+    public function isDebugMode(): bool
+    {
+        return $this->debugMode;
+    }
+
+    /**
      * Charge la liste des serveurs à surveiller
      */
     private function loadServers(): void
@@ -88,6 +110,15 @@ class LuaConsoleHookService
                 // Vérifier que le serveur est installé et non suspendu
                 return $server->isInstalled() && !$server->isSuspended() && $this->isGarrysModServer($server);
             })->values()->all();
+
+            if ($this->debugMode) {
+                echo "📊 Loaded servers for monitoring:\n";
+                foreach ($this->monitoredServers as $server) {
+                    $eggName = $server->egg ? $server->egg->name : 'No egg';
+                    echo "  - {$server->name} (ID: {$server->id}) - Egg: {$eggName}\n";
+                }
+                echo "  Total: " . count($this->monitoredServers) . " servers\n";
+            }
 
             Log::info('LuaConsoleHook: Loaded servers for monitoring', [
                 'total_servers' => count($this->monitoredServers)
@@ -110,7 +141,16 @@ class LuaConsoleHookService
 
         while ($this->isRunning) {
             try {
+                if ($this->debugMode) {
+                    echo "🔍 Checking all servers... (Interval: {$this->checkInterval}s)\n";
+                }
+                
                 $this->checkAllServers();
+                
+                if ($this->debugMode) {
+                    echo "⏳ Waiting {$this->checkInterval} seconds before next check...\n";
+                }
+                
                 sleep($this->checkInterval);
             } catch (\Exception $e) {
                 Log::error('LuaConsoleHook: Error in monitoring loop', [
@@ -150,6 +190,19 @@ class LuaConsoleHookService
             
             if (empty($consoleOutput)) {
                 return;
+            }
+
+            // En mode debug, afficher toutes les lignes de la console
+            if ($this->debugMode) {
+                $lines = explode("\n", $consoleOutput);
+                foreach ($lines as $lineNumber => $line) {
+                    $line = trim($line);
+                    if (!empty($line)) {
+                        $isError = $this->isLuaError($line);
+                        $status = $isError ? '🚨 ERROR' : '📝 INFO';
+                        echo "[{$status}] Server {$server->name} (ID: {$server->id}) - Line " . ($lineNumber + 1) . ": {$line}\n";
+                    }
+                }
             }
 
             // Parser pour détecter les erreurs Lua
@@ -336,6 +389,11 @@ class LuaConsoleHookService
 
                 // Envoyer une notification
                 $this->sendErrorNotification($server, $luaError);
+
+                if ($this->debugMode) {
+                    echo "🚨 NEW ERROR DETECTED! Server: {$server->name} - Type: {$error['type']} - Line: {$error['line']}\n";
+                    echo "   Content: {$error['content']}\n";
+                }
 
                 Log::info('LuaConsoleHook: New Lua error detected', [
                     'server_id' => $server->id,

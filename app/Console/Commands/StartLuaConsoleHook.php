@@ -13,7 +13,7 @@ class StartLuaConsoleHook extends Command
      *
      * @var string
      */
-    protected $signature = 'lua:hook-console {--daemon : Run as daemon process} {--stop : Stop running hook}';
+    protected $signature = 'lua:hook-console {--daemon : Run as daemon process} {--stop : Stop running hook} {--debug : Enable debug mode to see all console lines}';
 
     /**
      * The console command description.
@@ -37,6 +37,12 @@ class StartLuaConsoleHook extends Command
         
         try {
             $hookService = app(LuaConsoleHookService::class);
+            
+            // Activer le mode debug si l'option est spécifiée
+            if ($this->option('debug')) {
+                $hookService->setDebugMode(true);
+                $this->info('🐛 Debug mode enabled - All console lines will be displayed');
+            }
             
             if ($hookService->isRunning()) {
                 $this->warn('⚠️  Hook service is already running');
