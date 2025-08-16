@@ -48,6 +48,11 @@ class LuaConsoleHookService
     private bool $streamingMode = false;
 
     /**
+     * @var int|null
+     */
+    private ?int $targetServerId = null;
+
+    /**
      * @var bool
      */
     private bool $debugMode = false;
@@ -132,6 +137,31 @@ class LuaConsoleHookService
     }
 
     /**
+     * Définit l'ID du serveur à surveiller
+     */
+    public function setTargetServerId(int $serverId): void
+    {
+        $this->targetServerId = $serverId;
+        Log::info("LuaConsoleHook: Target server ID set to {$serverId}");
+    }
+
+    /**
+     * Obtient l'ID du serveur ciblé
+     */
+    public function getTargetServerId(): ?int
+    {
+        return $this->targetServerId;
+    }
+
+    /**
+     * Vérifie si un serveur spécifique est ciblé
+     */
+    public function hasTargetServer(): bool
+    {
+        return $this->targetServerId !== null;
+    }
+
+    /**
      * Vérifie si le mode debug est activé
      */
     public function isDebugMode(): bool
@@ -180,7 +210,14 @@ class LuaConsoleHookService
 
             $this->monitoredServers = $servers->filter(function ($server) {
                 // Vérifier que le serveur est installé et non suspendu
-                return $server->isInstalled() && !$server->isSuspended() && $this->isGarrysModServer($server);
+                $basicCheck = $server->isInstalled() && !$server->isSuspended() && $this->isGarrysModServer($server);
+                
+                // Si un serveur spécifique est ciblé, vérifier l'ID
+                if ($this->hasTargetServer()) {
+                    return $basicCheck && $server->id === $this->targetServerId;
+                }
+                
+                return $basicCheck;
             })->values()->all();
 
             if ($this->debugMode) {
@@ -740,6 +777,17 @@ class LuaConsoleHookService
      */
     private function createTestServers(): \Illuminate\Support\Collection
     {
+        // Si un serveur spécifique est ciblé, créer seulement celui-ci
+        if ($this->hasTargetServer()) {
+            $targetId = $this->targetServerId;
+            echo "🎯 Creating specific test server ID: {$targetId}\n";
+            
+            $server = $this->createMockServer($targetId, "Test GMod Server {$targetId}", 'Garry\'s Mod');
+            echo "✅ Created target test server ID: {$targetId}\n";
+            
+            return collect([$server]);
+        }
+        
         echo "🎮 Creating Garry's Mod test servers for demonstration...\n";
         
         // Créer seulement des serveurs Garry's Mod pour les tests
