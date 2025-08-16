@@ -2,630 +2,295 @@
 
 namespace App\Filament\Server\Pages;
 
-use App\Models\Server;
 use App\Models\LuaError;
+use App\Models\Server;
 use Filament\Actions\Action;
-use Filament\Actions\ActionGroup;
+use Filament\Forms\Components\Section;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Pages\Page;
-use Filament\Tables\Concerns\InteractsWithTable;
-use Filament\Tables\Contracts\HasTable;
-use Filament\Tables\Table;
-use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Actions\Action as TableAction;
 use Filament\Tables\Actions\BulkAction;
+use Filament\Tables\Concerns\InteractsWithTable;
+use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Filters\SelectFilter;
-use Filament\Tables\Filters\Filter;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\DatePicker;
+use Filament\Tables\Table;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ToggleColumn;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Log;
-use Livewire\Attributes\Computed;
-use Livewire\Component;
+use Illuminate\Support\Collection;
 
 class LuaErrorLogger extends Page implements HasTable
 {
     use InteractsWithTable;
 
-    protected static string $resource = Server::class;
+    protected static ?string $navigationIcon = 'tabler-bug';
+    protected static ?string $navigationLabel = 'Lua Error Logger';
+    protected static ?string $title = 'Lua Error Logger';
+    protected static ?string $slug = 'lua-error-logger';
+    protected static ?string $navigationGroup = 'Server Management';
 
-    protected static string $view = 'filament.server.pages.lua-error-logger';
-
-    public bool $showResolved = false;
-    public string $search = '';
-    public string $levelFilter = 'all';
-    public string $timeFilter = 'all';
-    public array $logs = [];
+    public Server $server;
+    public ?array $data = [];
 
     public function mount(): void
     {
-        Log::info('Livewire: LuaErrorLogger page mounted', [
-            'server_id' => $this->getServer()->id
+        $this->server = Server::findOrFail(request()->route('server'));
+        $this->form->fill([
+            'lua_error_logging_enabled' => $this->server->lua_error_logging_enabled,
+            'lua_error_logging_reason' => $this->server->lua_error_logging_reason,
+            'lua_error_control_enabled' => $this->server->lua_error_control_enabled,
+            'lua_error_control_reason' => $this->server->lua_error_control_reason,
         ]);
+    }
+
+    public function form(Form $form): Form
+    {
+        return $form
+            ->schema([
+                Section::make('Configuration des erreurs Lua')
+                    ->description('Configurez la collecte et le contrôle des erreurs Lua pour ce serveur')
+                    ->schema([
+                        Toggle::make('lua_error_logging_enabled')
+                            ->label('Collecte des erreurs Lua')
+                            ->helperText('Active la collecte automatique des erreurs Lua depuis la console du serveur')
+                            ->reactive(),
+                        
+                        Textarea::make('lua_error_logging_reason')
+                            ->label('Raison de la désactivation')
+                            ->helperText('Optionnel : expliquez pourquoi la collecte est désactivée')
+                            ->visible(fn ($get) => !$get('lua_error_logging_enabled'))
+                            ->rows(2),
+                        
+                        Toggle::make('lua_error_control_enabled')
+                            ->label('Contrôle des erreurs Lua')
+                            ->helperText('Permet de résoudre et gérer les erreurs collectées')
+                            ->disabled(fn ($get) => !$get('lua_error_logging_enabled'))
+                            ->reactive(),
+                        
+                        Textarea::make('lua_error_control_reason')
+                            ->label('Raison de la désactivation')
+                            ->helperText('Optionnel : expliquez pourquoi le contrôle est désactivé')
+                            ->visible(fn ($get) => !$get('lua_error_control_enabled'))
+                            ->rows(2),
+                    ])
+                    ->columns(2),
+            ]);
+    }
+
+    public function saveSettings(): void
+    {
+        $data = $this->form->getState();
         
-        // Charger les logs au démarrage
-        $this->loadLogs();
+        $this->server->update([
+            'lua_error_logging_enabled' => $data['lua_error_logging_enabled'],
+            'lua_error_logging_reason' => $data['lua_error_logging_enabled'] ? null : $data['lua_error_logging_reason'],
+            'lua_error_control_enabled' => $data['lua_error_control_enabled'],
+            'lua_error_control_reason' => $data['lua_error_control_enabled'] ? null : $data['lua_error_control_reason'],
+        ]);
+
+        $this->dispatch('notify', [
+            'status' => 'success',
+            'message' => 'Configuration sauvegardée avec succès'
+        ]);
     }
 
-    /**
-     * Watcher pour la recherche
-     */
-    public function updatedSearch(): void
-    {
-        $this->loadLogs();
-    }
-
-    /**
-     * Watcher pour le filtre de niveau
-     */
-    public function updatedLevelFilter(): void
-    {
-        $this->loadLogs();
-    }
-
-    /**
-     * Watcher pour le filtre de temps
-     */
-    public function updatedTimeFilter(): void
-    {
-        $this->loadLogs();
-    }
-
-    /**
-     * Watcher pour le bascule des erreurs résolues
-     */
-    public function updatedShowResolved(): void
-    {
-        $this->loadLogs();
-    }
-
-    public function getTitle(): string
-    {
-        return 'Logger d\'erreur Lua';
-    }
-
-    public function getSubheading(): string
-    {
-        return 'Consultez les erreurs Lua détectées sur votre serveur Garry\'s Mod';
-    }
-
-    public static function canAccess(): bool
-    {
-        /** @var Server $server */
-        $server = \Filament\Facades\Filament::getTenant();
-        
-        // Vérifier si c'est un serveur Garry's Mod
-        if (!$server->egg || $server->egg->name !== 'Garrys Mod') {
-            return false;
-        }
-        
-        // Vérifier les permissions
-        return auth()->user()->can(\App\Models\Permission::ACTION_FILE_READ, $server);
-    }
-
-    public static function getNavigationLabel(): string
-    {
-        return 'Logger d\'erreur Lua';
-    }
-
-    public static function getNavigationGroup(): ?string
-    {
-        return 'Outils et surveillance';
-    }
-
-    protected static ?int $navigationSort = 6;
-
-    protected static ?string $navigationIcon = 'tabler-bug';
-
-    #[Computed]
-    public function getServer(): Server
-    {
-        return \Filament\Facades\Filament::getTenant();
-    }
-
-    /**
-     * Configure le tableau Filament
-     */
     public function table(Table $table): Table
     {
-        $serverId = $this->getServer()->id;
-        $server = $this->getServer();
-        
-        // Vérifier si le contrôle des erreurs Lua est activé
-        if (!$server->lua_error_control_enabled) {
-            // Rediriger vers une page d'information ou afficher un message
-            $this->dispatch('notify', [
-                'status' => 'warning',
-                'message' => 'Le contrôle des erreurs Lua est désactivé pour ce serveur. Contactez l\'administrateur pour l\'activer.'
-            ]);
-            
-            // Retourner un tableau vide
+        // Vérifier si la collecte est désactivée
+        if (!$this->server->lua_error_logging_enabled) {
             return $table
                 ->query(LuaError::query()->where('id', 0)) // Requête vide
                 ->columns([
                     TextColumn::make('id')
-                        ->label('Contrôle désactivé')
-                        ->grow(false),
+                        ->label('Statut')
+                        ->getStateUsing(fn () => 'Collecte désactivée')
+                        ->html()
+                        ->getStateUsing(fn () => '<div class="text-center py-8 text-muted-foreground">
+                            <div class="text-lg font-medium">Collecte des erreurs Lua désactivée</div>
+                            <div class="text-sm">' . ($this->server->lua_error_logging_reason ?: 'Aucune raison spécifiée') . '</div>
+                        </div>'),
                 ])
-                ->actions([])
-                ->defaultSort('id', 'desc')
-                ->paginated([10])
-                ->defaultPaginationPageOption(10);
+                ->paginated(false);
         }
 
-        // Vérifier si le logging des erreurs Lua est activé
-        if (!$server->lua_error_logging_enabled) {
-            // Rediriger vers une page d'information ou afficher un message
-            $this->dispatch('notify', [
-                'status' => 'warning',
-                'message' => 'La collecte des erreurs Lua est désactivée pour ce serveur. Aucune erreur ne sera collectée.'
-            ]);
-            
-            // Retourner un tableau vide
+        // Vérifier si le contrôle est désactivé
+        if (!$this->server->lua_error_control_enabled) {
             return $table
                 ->query(LuaError::query()->where('id', 0)) // Requête vide
                 ->columns([
                     TextColumn::make('id')
-                        ->label('Collecte désactivée')
-                        ->grow(false),
+                        ->label('Statut')
+                        ->getStateUsing(fn () => 'Contrôle désactivé')
+                        ->html()
+                        ->getStateUsing(fn () => '<div class="text-center py-8 text-muted-foreground">
+                            <div class="text-lg font-medium">Contrôle des erreurs Lua désactivé</div>
+                            <div class="text-sm">' . ($this->server->lua_error_control_reason ?: 'Aucune raison spécifiée') . '</div>
+                        </div>'),
                 ])
-                ->actions([])
-                ->defaultSort('id', 'desc')
-                ->paginated([10])
-                ->defaultPaginationPageOption(10);
-        }
-        
-        // Debug temporaire
-        Log::info('LuaErrorLogger Debug - Server ID', ['server_id' => $serverId]);
-        
-        // Vérifier si le serveur existe
-        Log::info('LuaErrorLogger Debug - Server object', [
-            'server_exists' => $server ? 'yes' : 'no',
-            'server_class' => $server ? get_class($server) : 'null',
-            'lua_error_control_enabled' => $server->lua_error_control_enabled ?? 'null'
-        ]);
-        
-        // Vérifier la table lua_errors
-        try {
-            $totalErrors = LuaError::count();
-            $serverErrors = LuaError::where('server_id', $serverId)->count();
-            
-            Log::info('LuaErrorLogger Debug - Database check', [
-                'total_errors_in_table' => $totalErrors,
-                'errors_for_server' => $serverErrors,
-                'server_id_checked' => $serverId
-            ]);
-            
-            // Vérifier un exemple d'erreur
-            $sampleError = LuaError::first();
-            Log::info('LuaErrorLogger Debug - Sample error', [
-                'sample_exists' => $sampleError ? 'yes' : 'no',
-                'sample_data' => $sampleError ? $sampleError->toArray() : 'null'
-            ]);
-            
-        } catch (\Exception $e) {
-            Log::error('LuaErrorLogger Debug - Database error', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
+                ->paginated(false);
         }
 
-        // Tableau avec toutes les actions
         return $table
-            ->query(LuaError::query()->where('server_id', $serverId)->where('resolved', false))
+            ->query(LuaError::query()->where('server_id', $this->server->id)->where('resolved', false))
             ->columns([
                 TextColumn::make('id')
                     ->label('ID')
-                    ->grow(false),
-
+                    ->sortable()
+                    ->searchable(),
+                
+                TextColumn::make('first_seen')
+                    ->label('Première fois')
+                    ->dateTime('d/m/Y H:i')
+                    ->sortable(),
+                
+                TextColumn::make('level')
+                    ->label('Niveau')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'error' => 'danger',
+                        'warning' => 'warning',
+                        'info' => 'info',
+                        default => 'gray',
+                    }),
+                
                 TextColumn::make('message')
                     ->label('Message')
-                    ->limit(100)
-                    ->grow(),
-
-                TextColumn::make('resolved')
-                    ->label('Statut')
-                    ->grow(false),
+                    ->limit(50)
+                    ->searchable(),
+                
+                ToggleColumn::make('resolved')
+                    ->label('Résolu')
+                    ->disabled(),
+            ])
+            ->filters([
+                SelectFilter::make('level')
+                    ->options([
+                        'error' => 'Erreur',
+                        'warning' => 'Avertissement',
+                        'info' => 'Information',
+                    ]),
+                
+                SelectFilter::make('resolved')
+                    ->options([
+                        '0' => 'Non résolu',
+                        '1' => 'Résolu',
+                    ])
+                    ->default('0'),
             ])
             ->actions([
                 TableAction::make('view')
-                    ->label('Voir détails')
+                    ->label('Voir')
                     ->icon('tabler-eye')
-                    ->color('info')
-                    ->modalContent(fn ($record) => view('filament.server.modals.lua-error-details', ['error' => $record]))
+                    ->modalContent(fn (LuaError $record) => view('filament.server.modals.lua-error-details', ['error' => $record]))
                     ->modalSubmitAction(false)
                     ->modalCancelActionLabel('Fermer'),
-
+                
                 TableAction::make('resolve')
                     ->label('Résoudre')
                     ->icon('tabler-check')
                     ->color('success')
-                    ->visible(fn ($record) => !$record->resolved)
-                    ->action(function ($record) {
-                        if ($record && $record->error_key) {
-                            $this->markAsResolved($record->error_key);
-                            // Rafraîchir le tableau pour faire disparaître le bouton
-                            $this->dispatch('$refresh');
-                        }
-                    })
-                    ->requiresConfirmation()
-                    ->modalHeading('Marquer comme résolu')
-                    ->modalDescription('Êtes-vous sûr de vouloir marquer cette erreur comme résolue ?')
-                    ->modalSubmitActionLabel('Résoudre'),
-
+                    ->action(fn (LuaError $record) => $this->markAsResolved($record))
+                    ->visible(fn (LuaError $record) => !$record->resolved),
+                
+                TableAction::make('unresolve')
+                    ->label('Marquer non résolu')
+                    ->icon('tabler-x')
+                    ->color('warning')
+                    ->action(fn (LuaError $record) => $this->markAsUnresolved($record))
+                    ->visible(fn (LuaError $record) => $record->resolved),
+                
                 TableAction::make('delete')
                     ->label('Supprimer')
                     ->icon('tabler-trash')
                     ->color('danger')
-                    ->action(function ($record) {
-                        if ($record && $record->error_key) {
-                            $this->deleteError($record->error_key);
-                            // Rafraîchir le tableau pour faire disparaître la ligne
-                            $this->dispatch('$refresh');
-                        }
-                    })
                     ->requiresConfirmation()
-                    ->modalHeading('Supprimer l\'erreur')
-                    ->modalDescription('Êtes-vous sûr de vouloir supprimer cette erreur ? Cette action est irréversible.')
-                    ->modalSubmitActionLabel('Supprimer'),
+                    ->action(fn (LuaError $record) => $this->deleteError($record)),
             ])
-            ->defaultSort('id', 'desc')
-            ->paginated([10])
-            ->defaultPaginationPageOption(10);
-    }
-
-    /**
-     * Charge les logs depuis la base de données
-     */
-    public function loadLogs(): void
-    {
-        try {
-            $serverId = $this->getServer()->id;
-            
-            // Requête de base
-            $query = LuaError::where('server_id', $serverId);
-
-            // Filtre de recherche
-            if (!empty($this->search)) {
-                $query->where(function($q) {
-                    $q->where('message', 'like', '%' . $this->search . '%')
-                      ->orWhere('addon', 'like', '%' . $this->search . '%');
-                });
-            }
-
-            // Filtre de niveau
-            if ($this->levelFilter !== 'all') {
-                $query->where('level', $this->levelFilter);
-            }
-
-            // Filtre de temps
-            if ($this->timeFilter !== 'all') {
-                $timeRanges = [
-                    'today' => now()->startOfDay(),
-                    'week' => now()->subWeek(),
-                    'month' => now()->subMonth(),
-                ];
+            ->bulkActions([
+                BulkAction::make('resolve')
+                    ->label('Marquer comme résolu')
+                    ->icon('tabler-check')
+                    ->color('success')
+                    ->action(fn (Collection $records) => $records->each(fn (LuaError $record) => $this->markAsResolved($record))),
                 
-                if (isset($timeRanges[$this->timeFilter])) {
-                    $query->where('first_seen', '>=', $timeRanges[$this->timeFilter]);
-                }
-            }
-
-            // Filtre des erreurs résolues - IMPORTANT: par défaut on affiche TOUTES les erreurs
-            if (!$this->showResolved) {
-                // On affiche les erreurs non résolues ET les erreurs sans statut résolu
-                $query->where(function($q) {
-                    $q->where('resolved', false)
-                      ->orWhereNull('resolved');
-                });
-            }
-
-            $this->logs = $query->orderBy('first_seen', 'desc')->get()->toArray();
-
-        } catch (\Exception $e) {
-            Log::error('Livewire: Failed to load logs', [
-                'server_id' => $this->getServer()->id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-
-            $this->logs = [];
-        }
+                BulkAction::make('delete')
+                    ->label('Supprimer')
+                    ->icon('tabler-trash')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->action(fn (Collection $records) => $records->each(fn (LuaError $record) => $this->deleteError($record))),
+            ])
+            ->defaultSort('first_seen', 'desc');
     }
 
-    #[Computed]
-    public function getLogs(): array
-    {
-        // Si les logs ne sont pas chargés, les charger
-        if (empty($this->logs)) {
-            $this->loadLogs();
-        }
-        
-        return $this->logs;
-    }
-
-    /**
-     * Affiche une erreur
-     */
-    public function viewError(LuaError $record): void
-    {
-        Log::info('LuaErrorLogger: Viewing error', [
-            'error_id' => $record->id,
-            'message' => $record->message
-        ]);
-    }
-
-    /**
-     * Marque une erreur comme résolue
-     */
-    public function markAsResolved(string $errorKey): void
-    {
-        try {
-            $error = LuaError::where('error_key', $errorKey)->first();
-            if ($error) {
-                $error->update([
-                    'resolved' => true,
-                    'resolved_at' => now(),
-                ]);
-                
-                $this->dispatch('notify', [
-                    'status' => 'success',
-                    'message' => 'Erreur marquée comme résolue'
-                ]);
-            }
-        } catch (\Exception $e) {
-            Log::error('Erreur lors de la résolution', ['error' => $e->getMessage()]);
-            $this->dispatch('notify', [
-                'status' => 'danger',
-                'message' => 'Erreur lors de la résolution'
-            ]);
-        }
-    }
-
-    /**
-     * Marque une erreur comme non résolue
-     */
-    public function markAsUnresolved(string $errorKey): void
-    {
-        try {
-            $error = LuaError::where('error_key', $errorKey)->first();
-            if ($error) {
-                $error->update([
-                    'resolved' => false,
-                    'resolved_at' => null,
-                ]);
-                
-                $this->dispatch('notify', [
-                    'status' => 'success',
-                    'message' => 'Erreur rouverte'
-                ]);
-            }
-        } catch (\Exception $e) {
-            Log::error('Erreur lors de la réouverture', ['error' => $e->getMessage()]);
-            $this->dispatch('notify', [
-                'status' => 'danger',
-                'message' => 'Erreur lors de la réouverture'
-            ]);
-        }
-    }
-
-    /**
-     * Supprime une erreur
-     */
-    public function deleteError(string $errorKey): void
-    {
-        try {
-            $error = LuaError::where('error_key', $errorKey)->first();
-            if ($error) {
-                $error->delete();
-                $this->dispatch('notify', [
-                    'status' => 'success',
-                    'message' => 'Erreur supprimée'
-                ]);
-            }
-        } catch (\Exception $e) {
-            Log::error('Erreur lors de la suppression', ['error' => $e->getMessage()]);
-            $this->dispatch('notify', [
-                'status' => 'danger',
-                'message' => 'Erreur lors de la suppression'
-            ]);
-        }
-    }
-
-    /**
-     * Vide tous les logs
-     */
     public function clearLogs(): void
     {
-        try {
-            $serverId = $this->getServer()->id;
-            $deleted = LuaError::where('server_id', $serverId)->delete();
-            
-            $this->dispatch('notify', [
-                'status' => 'success',
-                'message' => "{$deleted} erreurs supprimées"
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Erreur lors du nettoyage', ['error' => $e->getMessage()]);
-            $this->dispatch('notify', [
-                'status' => 'danger',
-                'message' => 'Erreur lors du nettoyage'
-            ]);
-        }
-    }
-
-    /**
-     * Exporte les logs
-     */
-    public function exportLogs(): void
-    {
-        try {
-            $serverId = $this->getServer()->id;
-            $errors = LuaError::where('server_id', $serverId)
-                ->orderBy('first_seen', 'desc')
-                ->get();
-
-            $content = "ID,Date première détection,Niveau,Message,Addon,Statut\n";
-            foreach ($errors as $error) {
-                $content .= sprintf(
-                    "%s,%s,%s,%s,%s,%s\n",
-                    $error->id,
-                    $error->first_seen,
-                    $error->level,
-                    str_replace(',', ';', $error->message),
-                    $error->addon,
-                    $error->resolved ? 'Résolu' : 'Ouvert'
-                );
-            }
-
-            $filename = "lua-errors-server-{$serverId}-" . now()->format('Y-m-d-H-i-s') . ".csv";
-            
-            $this->dispatch('download-file', [
-                'filename' => $filename,
-                'content' => $content,
-                'mime' => 'text/csv'
-            ]);
-
-            $this->dispatch('notify', [
-                'status' => 'success',
-                'message' => 'Export terminé'
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Erreur lors de l\'export', ['error' => $e->getMessage()]);
-            $this->dispatch('notify', [
-                'status' => 'danger',
-                'message' => 'Erreur lors de l\'export'
-            ]);
-        }
-    }
-
-    /**
-     * Bascule l'affichage des erreurs résolues
-     */
-    public function toggleShowResolved(): void
-    {
-        $this->showResolved = !$this->showResolved;
+        $count = LuaError::where('server_id', $this->server->id)->count();
         
-        Log::info('Livewire: Toggle show resolved', [
-            'server_id' => $this->getServer()->id,
-            'show_resolved' => $this->showResolved
+        LuaError::where('server_id', $this->server->id)->delete();
+        
+        $this->dispatch('notify', [
+            'status' => 'success',
+            'message' => "{$count} erreurs supprimées avec succès"
         ]);
         
-        // Recharger les logs avec le nouveau filtre
-        $this->loadLogs();
+        $this->dispatch('$refresh');
     }
 
-    /**
-     * Force l'affichage de toutes les erreurs (même résolues)
-     */
-    public function showAllErrors(): void
+    public function markAsResolved(LuaError $error): void
     {
-        $this->showResolved = true;
-        $this->search = '';
-        $this->levelFilter = 'all';
-        $this->timeFilter = 'all';
-        
-        Log::info('Livewire: Showing all errors', [
-            'server_id' => $this->getServer()->id
+        $error->update([
+            'resolved' => true,
+            'resolved_at' => now(),
         ]);
         
-        // Forcer le refresh du tableau
-        $this->refreshTable();
+        $this->dispatch('notify', [
+            'status' => 'success',
+            'message' => 'Erreur marquée comme résolue'
+        ]);
+        
+        $this->dispatch('$refresh');
     }
 
-    /**
-     * Affiche les erreurs sans filtres
-     */
-    public function showErrorsWithoutFilters(): void
+    public function markAsUnresolved(LuaError $error): void
     {
-        try {
-            $serverId = $this->getServer()->id;
-            
-            // Récupérer toutes les erreurs sans filtres
-            $allErrors = LuaError::where('server_id', $serverId)->get();
-            
-            Log::info('Livewire: Showing errors without filters', [
-                'server_id' => $serverId,
-                'total_errors' => $allErrors->count(),
-                'errors' => $allErrors->toArray()
-            ]);
-            
-            // Afficher dans la session pour debug
-            session()->flash('debug_info', [
-                'server_id' => $serverId,
-                'total_errors_for_server' => $allErrors->count(),
-                'errors_without_filters' => $allErrors->toArray()
-            ]);
-            
-            // Forcer le refresh du tableau
-            $this->refreshTable();
-            
-        } catch (\Exception $e) {
-            Log::error('Livewire: Failed to show errors without filters', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            
-            session()->flash('debug_error', $e->getMessage());
-        }
+        $error->update([
+            'resolved' => false,
+            'resolved_at' => null,
+        ]);
+        
+        $this->dispatch('notify', [
+            'status' => 'success',
+            'message' => 'Erreur marquée comme non résolue'
+        ]);
+        
+        $this->dispatch('$refresh');
     }
 
-    /**
-     * Convertit les logs en CSV
-     */
-    private function toCsv(array $logs): string
+    public function deleteError(LuaError $error): void
     {
-        if (empty($logs)) {
-            return '';
-        }
-
-        $headers = array_keys($logs[0]);
-        $csv = implode(',', $headers) . "\n";
-
-        foreach ($logs as $log) {
-            $csv .= implode(',', array_map(function($value) {
-                return '"' . str_replace('"', '""', $value) . '"';
-            }, $log)) . "\n";
-        }
-
-        return $csv;
-    }
-
-    /**
-     * Convertit les logs en texte
-     */
-    private function toText(array $logs): string
-    {
-        if (empty($logs)) {
-            return 'Aucun log trouvé.';
-        }
-
-        $text = "Logs d'erreurs Lua\n";
-        $text .= str_repeat('=', 50) . "\n\n";
-
-        foreach ($logs as $log) {
-            $text .= "Erreur #{$log['id']}\n";
-            $text .= "Message: {$log['message']}\n";
-            $text .= "Addon: {$log['addon']}\n";
-            $text .= "Première fois: {$log['first_seen']}\n";
-            $text .= "Dernière fois: {$log['last_seen']}\n";
-            $text .= "Compteur: {$log['count']}x\n";
-            $text .= str_repeat('-', 30) . "\n\n";
-        }
-
-        return $text;
-    }
-
-    /**
-     * Rafraîchit le tableau
-     */
-    public function refreshTable(): void
-    {
-        $this->resetTable();
-        Log::info('LuaErrorLogger: Table refreshed');
+        $error->delete();
+        
+        $this->dispatch('notify', [
+            'status' => 'success',
+            'message' => 'Erreur supprimée avec succès'
+        ]);
+        
+        $this->dispatch('$refresh');
     }
 
     protected function getHeaderActions(): array
     {
-        return [];
+        return [
+            Action::make('saveSettings')
+                ->label('Sauvegarder la configuration')
+                ->submit('saveSettings')
+                ->color('success')
+                ->icon('tabler-settings'),
+        ];
     }
 }
