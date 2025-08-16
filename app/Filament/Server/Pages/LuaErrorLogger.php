@@ -164,25 +164,77 @@ class LuaErrorLogger extends Page implements HasTable
             ]);
         }
 
-        // Tableau ultra-basique - juste pour tester
+        // Tableau avec informations de base et actions
         return $table
             ->query(LuaError::query()->where('server_id', $serverId))
             ->columns([
                 TextColumn::make('id')
                     ->label('ID')
+                    ->sortable()
+                    ->grow(false),
+
+                TextColumn::make('first_seen')
+                    ->label('Première fois')
+                    ->dateTime('d/m/Y H:i:s')
+                    ->sortable()
+                    ->grow(false),
+
+                TextColumn::make('level')
+                    ->label('Niveau')
+                    ->badge()
+                    ->color(fn ($state) => match($state) {
+                        'ERROR' => 'danger',
+                        'WARNING' => 'warning',
+                        'INFO' => 'info',
+                        default => 'gray'
+                    })
+                    ->grow(false),
+
+                TextColumn::make('message')
+                    ->label('Message d\'erreur')
+                    ->limit(80)
+                    ->grow(),
+
+                TextColumn::make('resolved')
+                    ->label('Statut')
+                    ->badge()
+                    ->color(fn ($state) => $state ? 'success' : 'warning')
+                    ->label(fn ($state) => $state ? 'Résolu' : 'Ouvert')
                     ->grow(false),
             ])
             ->actions([
                 TableAction::make('view')
-                    ->label('Voir')
+                    ->label('Voir détails')
                     ->icon('tabler-eye')
-                    ->action(function ($record) {
-                        Log::info('View action clicked', ['record' => $record ? $record->toArray() : 'null']);
-                    }),
+                    ->color('info')
+                    ->modalContent(fn ($record) => view('filament.server.modals.lua-error-details', ['error' => $record]))
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Fermer'),
+
+                TableAction::make('resolve')
+                    ->label('Résoudre')
+                    ->icon('tabler-check')
+                    ->color('success')
+                    ->visible(fn ($record) => !$record->resolved)
+                    ->action(fn ($record) => $this->markAsResolved($record->error_key))
+                    ->requiresConfirmation()
+                    ->modalHeading('Marquer comme résolu')
+                    ->modalDescription('Êtes-vous sûr de vouloir marquer cette erreur comme résolue ?')
+                    ->modalSubmitActionLabel('Résoudre'),
+
+                TableAction::make('delete')
+                    ->label('Supprimer')
+                    ->icon('tabler-trash')
+                    ->color('danger')
+                    ->action(fn ($record) => $this->deleteError($record->error_key))
+                    ->requiresConfirmation()
+                    ->modalHeading('Supprimer l\'erreur')
+                    ->modalDescription('Êtes-vous sûr de vouloir supprimer cette erreur ? Cette action est irréversible.')
+                    ->modalSubmitActionLabel('Supprimer'),
             ])
-            ->defaultSort('id', 'desc')
-            ->paginated([10])
-            ->defaultPaginationPageOption(10);
+            ->defaultSort('first_seen', 'desc')
+            ->paginated([25, 50, 100])
+            ->defaultPaginationPageOption(25);
     }
 
     /**
