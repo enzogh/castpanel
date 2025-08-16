@@ -164,155 +164,25 @@ class LuaErrorLogger extends Page implements HasTable
             ]);
         }
 
-        // Tableau avec actions complètes
+        // Tableau ultra-basique - juste pour tester
         return $table
             ->query(LuaError::query()->where('server_id', $serverId))
             ->columns([
                 TextColumn::make('id')
                     ->label('ID')
-                    ->sortable()
                     ->grow(false),
-
-                TextColumn::make('first_seen')
-                    ->label('Première fois')
-                    ->dateTime('d/m/Y H:i:s')
-                    ->sortable()
-                    ->grow(false),
-
-                TextColumn::make('level')
-                    ->label('Niveau')
-                    ->badge()
-                    ->color(fn ($state) => match($state) {
-                        'ERROR' => 'danger',
-                        'WARNING' => 'warning',
-                        'INFO' => 'info',
-                        default => 'gray'
-                    })
-                    ->grow(false),
-
-                TextColumn::make('message')
-                    ->label('Message d\'erreur')
-                    ->limit(80)
-                    ->searchable()
-                    ->grow(),
-
-                TextColumn::make('resolved')
-                    ->label('Statut')
-                    ->badge()
-                    ->color(fn ($state) => $state ? 'success' : 'warning')
-                    ->label(fn ($state) => $state ? 'Résolu' : 'Ouvert')
-                    ->grow(false),
-            ])
-            ->filters([
-                SelectFilter::make('level')
-                    ->label('Niveau')
-                    ->options([
-                        'ERROR' => 'Erreur',
-                        'WARNING' => 'Avertissement',
-                        'INFO' => 'Information'
-                    ]),
-
-                SelectFilter::make('resolved')
-                    ->label('Statut')
-                    ->options([
-                        '0' => 'Non résolues',
-                        '1' => 'Résolues'
-                    ])
-                    ->query(function ($query, array $data) {
-                        if (isset($data['value'])) {
-                            $query->where('resolved', $data['value'] === '1');
-                        }
-                    }),
-
-                Filter::make('search')
-                    ->form([
-                        TextInput::make('search')
-                            ->label('Rechercher')
-                            ->placeholder('Rechercher dans les messages...')
-                    ])
-                    ->query(function ($query, array $data) {
-                        if (!empty($data['search'])) {
-                            $query->where('message', 'like', '%' . $data['search'] . '%');
-                        }
-                    }),
             ])
             ->actions([
-                TableAction::make('resolve')
-                    ->label('Résoudre')
-                    ->icon('tabler-check')
-                    ->color('success')
-                    ->visible(fn ($record) => $record && !$record->resolved)
-                    ->action(fn ($record) => $this->markAsResolved($record->error_key))
-                    ->requiresConfirmation()
-                    ->modalHeading('Marquer comme résolu')
-                    ->modalDescription('Êtes-vous sûr de vouloir marquer cette erreur comme résolue ?')
-                    ->modalSubmitActionLabel('Résoudre'),
-
-                TableAction::make('unresolve')
-                    ->label('Rouvrir')
-                    ->icon('tabler-x')
-                    ->color('warning')
-                    ->visible(fn ($record) => $record && $record->resolved)
-                    ->action(fn ($record) => $this->markAsUnresolved($record->error_key))
-                    ->requiresConfirmation()
-                    ->modalHeading('Rouvrir l\'erreur')
-                    ->modalDescription('Êtes-vous sûr de vouloir rouvrir cette erreur ?')
-                    ->modalSubmitActionLabel('Rouvrir'),
-
-                TableAction::make('delete')
-                    ->label('Supprimer')
-                    ->icon('tabler-trash')
-                    ->color('danger')
-                    ->action(fn ($record) => $this->deleteError($record->error_key))
-                    ->requiresConfirmation()
-                    ->modalHeading('Supprimer l\'erreur')
-                    ->modalDescription('Êtes-vous sûr de vouloir supprimer cette erreur ? Cette action est irréversible.')
-                    ->modalSubmitActionLabel('Supprimer'),
-
                 TableAction::make('view')
-                    ->label('Voir détails')
+                    ->label('Voir')
                     ->icon('tabler-eye')
-                    ->color('info')
-                    ->modalContent(fn ($record) => $record ? view('filament.server.modals.lua-error-details', ['error' => $record]) : 'Erreur non trouvée')
-                    ->modalSubmitAction(false)
-                    ->modalCancelActionLabel('Fermer'),
+                    ->action(function ($record) {
+                        Log::info('View action clicked', ['record' => $record ? $record->toArray() : 'null']);
+                    }),
             ])
-            ->bulkActions([
-                BulkAction::make('resolve_selected')
-                    ->label('Résoudre la sélection')
-                    ->icon('tabler-check')
-                    ->color('success')
-                    ->action(function ($records) {
-                        foreach ($records as $record) {
-                            if ($record && $record->error_key) {
-                                $this->markAsResolved($record->error_key);
-                            }
-                        }
-                    })
-                    ->requiresConfirmation()
-                    ->modalHeading('Résoudre les erreurs sélectionnées')
-                    ->modalDescription('Êtes-vous sûr de vouloir marquer ces erreurs comme résolues ?')
-                    ->modalSubmitActionLabel('Résoudre'),
-
-                BulkAction::make('delete_selected')
-                    ->label('Supprimer la sélection')
-                    ->icon('tabler-trash')
-                    ->color('danger')
-                    ->action(function ($records) {
-                        foreach ($records as $record) {
-                            if ($record && $record->error_key) {
-                                $this->deleteError($record->error_key);
-                            }
-                        }
-                    })
-                    ->requiresConfirmation()
-                    ->modalHeading('Supprimer les erreurs sélectionnées')
-                    ->modalDescription('Êtes-vous sûr de vouloir supprimer ces erreurs ? Cette action est irréversible.')
-                    ->modalSubmitActionLabel('Supprimer'),
-            ])
-            ->defaultSort('first_seen', 'desc')
-            ->paginated([25, 50, 100])
-            ->defaultPaginationPageOption(25);
+            ->defaultSort('id', 'desc')
+            ->paginated([10])
+            ->defaultPaginationPageOption(10);
     }
 
     /**
