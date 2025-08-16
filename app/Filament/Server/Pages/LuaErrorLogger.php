@@ -21,12 +21,48 @@ class LuaErrorLogger extends Page
     public string $search = '';
     public string $levelFilter = 'all';
     public string $timeFilter = 'all';
+    public array $logs = [];
 
     public function mount(): void
     {
         Log::info('Livewire: LuaErrorLogger page mounted', [
             'server_id' => $this->getServer()->id
         ]);
+        
+        // Charger les logs au démarrage
+        $this->loadLogs();
+    }
+
+    /**
+     * Watcher pour la recherche
+     */
+    public function updatedSearch(): void
+    {
+        $this->loadLogs();
+    }
+
+    /**
+     * Watcher pour le filtre de niveau
+     */
+    public function updatedLevelFilter(): void
+    {
+        $this->loadLogs();
+    }
+
+    /**
+     * Watcher pour le filtre de temps
+     */
+    public function updatedTimeFilter(): void
+    {
+        $this->loadLogs();
+    }
+
+    /**
+     * Watcher pour le bascule des erreurs résolues
+     */
+    public function updatedShowResolved(): void
+    {
+        $this->loadLogs();
     }
 
     public function getTitle(): string
@@ -73,14 +109,16 @@ class LuaErrorLogger extends Page
         return \Filament\Facades\Filament::getTenant();
     }
 
-    #[Computed]
-    public function getLogs(): array
+    /**
+     * Charge les logs depuis la base de données
+     */
+    public function loadLogs(): void
     {
         try {
             $serverId = $this->getServer()->id;
             
             // Debug: afficher l'ID du serveur
-            Log::info('Livewire: Getting logs for server', ['server_id' => $serverId]);
+            Log::info('Livewire: Loading logs for server', ['server_id' => $serverId]);
             
             // Requête de base
             $query = LuaError::where('server_id', $serverId);
@@ -92,7 +130,8 @@ class LuaErrorLogger extends Page
             // Si pas d'erreurs, retourner vide
             if ($totalBeforeFilters === 0) {
                 Log::warning('Livewire: No errors found for server', ['server_id' => $serverId]);
-                return [];
+                $this->logs = [];
+                return;
             }
 
             // Filtre de recherche
@@ -135,35 +174,44 @@ class LuaErrorLogger extends Page
             $bindings = $query->getBindings();
             Log::info('Livewire: SQL query', ['sql' => $sql, 'bindings' => $bindings]);
 
-            $logs = $query->orderBy('first_seen', 'desc')->get()->toArray();
+            $this->logs = $query->orderBy('first_seen', 'desc')->get()->toArray();
 
             // Debug: afficher le résultat final
-            Log::info('Livewire: Logs retrieved successfully', [
+            Log::info('Livewire: Logs loaded successfully', [
                 'server_id' => $serverId,
                 'total_before_filters' => $totalBeforeFilters,
-                'logs_count' => count($logs),
+                'logs_count' => count($this->logs),
                 'show_resolved' => $this->showResolved,
                 'filters' => [
                     'search' => $this->search,
                     'level' => $this->levelFilter,
                     'time' => $this->timeFilter
                 ],
-                'first_log' => $logs[0] ?? 'no logs',
+                'first_log' => $this->logs[0] ?? 'no logs',
                 'sql_query' => $sql,
                 'sql_bindings' => $bindings
             ]);
 
-            return $logs;
-
         } catch (\Exception $e) {
-            Log::error('Livewire: Failed to retrieve logs', [
+            Log::error('Livewire: Failed to load logs', [
                 'server_id' => $this->getServer()->id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
 
-            return [];
+            $this->logs = [];
         }
+    }
+
+    #[Computed]
+    public function getLogs(): array
+    {
+        // Si les logs ne sont pas chargés, les charger
+        if (empty($this->logs)) {
+            $this->loadLogs();
+        }
+        
+        return $this->logs;
     }
 
     public function markAsResolved(string $errorKey): void
@@ -181,7 +229,8 @@ class LuaErrorLogger extends Page
                     'error_key' => $errorKey
                 ]);
 
-                $this->dispatch('$refresh');
+                // Recharger les logs
+                $this->loadLogs();
             }
 
         } catch (\Exception $e) {
@@ -208,7 +257,8 @@ class LuaErrorLogger extends Page
                     'error_key' => $errorKey
                 ]);
 
-                $this->dispatch('$refresh');
+                // Recharger les logs
+                $this->loadLogs();
             }
 
         } catch (\Exception $e) {
@@ -222,7 +272,7 @@ class LuaErrorLogger extends Page
 
     public function refreshLogs(): void
     {
-        $this->dispatch('$refresh');
+        $this->loadLogs(); // Utiliser loadLogs pour rafraîchir les logs
     }
 
     public function clearLogs(): void
@@ -234,7 +284,8 @@ class LuaErrorLogger extends Page
                 'server_id' => $this->getServer()->id
             ]);
 
-            $this->dispatch('$refresh');
+            // Recharger les logs (sera vide)
+            $this->loadLogs();
 
         } catch (\Exception $e) {
             Log::error('Livewire: Failed to clear logs', [
@@ -307,7 +358,8 @@ class LuaErrorLogger extends Page
             'show_resolved' => $this->showResolved
         ]);
         
-        $this->dispatch('$refresh');
+        // Recharger les logs avec le nouveau filtre
+        $this->loadLogs();
     }
 
     /**
@@ -328,7 +380,8 @@ class LuaErrorLogger extends Page
                     'error_key' => $errorKey
                 ]);
 
-                $this->dispatch('$refresh');
+                // Recharger les logs
+                $this->loadLogs();
             }
 
         } catch (\Exception $e) {
@@ -354,7 +407,8 @@ class LuaErrorLogger extends Page
             'server_id' => $this->getServer()->id
         ]);
         
-        $this->dispatch('$refresh');
+        // Recharger les logs avec tous les filtres désactivés
+        $this->loadLogs();
     }
 
     /**
