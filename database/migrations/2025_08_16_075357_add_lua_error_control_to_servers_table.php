@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('servers', function (Blueprint $table) {
-            $table->boolean('lua_error_control_enabled')->default(true)->after('suspended');
+            $table->boolean('lua_error_control_enabled')->default(true)->after('updated_at');
             $table->text('lua_error_control_reason')->nullable()->after('lua_error_control_enabled');
         });
     }
