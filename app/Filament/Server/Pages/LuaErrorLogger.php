@@ -9,7 +9,6 @@ use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Form;
-use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Tables\Actions\Action as TableAction;
 use Filament\Tables\Actions\BulkAction;
@@ -19,8 +18,6 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ToggleColumn;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Collection;
 
 class LuaErrorLogger extends Page implements HasTable
@@ -38,11 +35,15 @@ class LuaErrorLogger extends Page implements HasTable
 
     public function mount(): void
     {
-        $this->server = Server::findOrFail(request()->route('server'));
+        // Récupérer le serveur depuis l'URL
+        $serverId = request()->route('server');
+        $this->server = Server::findOrFail($serverId);
+        
+        // Initialiser le formulaire avec les valeurs actuelles
         $this->form->fill([
-            'lua_error_logging_enabled' => $this->server->lua_error_logging_enabled,
+            'lua_error_logging_enabled' => $this->server->lua_error_logging_enabled ?? true,
             'lua_error_logging_reason' => $this->server->lua_error_logging_reason,
-            'lua_error_control_enabled' => $this->server->lua_error_control_enabled,
+            'lua_error_control_enabled' => $this->server->lua_error_control_enabled ?? true,
             'lua_error_control_reason' => $this->server->lua_error_control_reason,
         ]);
     }
