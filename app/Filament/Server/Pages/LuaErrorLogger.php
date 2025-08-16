@@ -7,6 +7,8 @@ use App\Models\LuaError;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Pages\Page;
+use Filament\Tables\Concerns\InteractsWithTable;
+use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Actions\Action as TableAction;
@@ -20,8 +22,10 @@ use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 
-class LuaErrorLogger extends Page
+class LuaErrorLogger extends Page implements HasTable
 {
+    use InteractsWithTable;
+
     protected static string $resource = Server::class;
 
     protected static string $view = 'filament.server.pages.lua-error-logger';
