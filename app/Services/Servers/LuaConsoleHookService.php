@@ -579,27 +579,63 @@ class LuaConsoleHookService
      */
     private function isGarrysModServer($server): bool
     {
-        // En mode debug, accepter tous les serveurs pour les tests
-        if ($this->debugMode) {
-            return true;
+        // En mode debug, accepter nos serveurs de test
+        if ($this->debugMode && !($server instanceof Server)) {
+            // C'est un serveur de test, vérifier son egg
+            if (!$server->egg) {
+                if ($this->debugMode) {
+                    echo "    DEBUG: Test server has no egg\n";
+                }
+                return false;
+            }
+
+            $eggName = strtolower($server->egg->name ?? '');
+            
+            if ($this->debugMode) {
+                echo "    DEBUG: Checking test server egg name: '{$eggName}'\n";
+            }
+            
+            $patterns = ['garry\'s mod', 'gmod', 'garrysmod'];
+            foreach ($patterns as $pattern) {
+                if (Str::contains($eggName, $pattern)) {
+                    if ($this->debugMode) {
+                        echo "    DEBUG: Test server matched pattern: '{$pattern}'\n";
+                    }
+                    return true;
+                }
+            }
+            if ($this->debugMode) {
+                echo "    DEBUG: Test server no pattern matched\n";
+            }
+            return false;
         }
 
-        // Vérifier que c'est bien un modèle Server
+        // Vérifier que c'est bien un modèle Server en production
         if (!$server instanceof Server) {
+            if ($this->debugMode) {
+                echo "    DEBUG: Server is not Server instance\n";
+            }
             return false;
         }
 
         if (!$server->egg) {
+            if ($this->debugMode) {
+                echo "    DEBUG: Server has no egg\n";
+            }
             return false;
         }
 
         $eggName = strtolower($server->egg->name ?? '');
         
+        if ($this->debugMode) {
+            echo "    DEBUG: Checking egg name: '{$eggName}'\n";
+        }
+        
+        // En mode production, être strict
         return Str::contains($eggName, [
             'garry\'s mod',
             'gmod',
-            'garrysmod',
-            'source engine'
+            'garrysmod'
         ]);
     }
 
@@ -704,15 +740,16 @@ class LuaConsoleHookService
      */
     private function createTestServers(): \Illuminate\Support\Collection
     {
-        echo "🎮 Creating test servers for demonstration...\n";
+        echo "🎮 Creating Garry's Mod test servers for demonstration...\n";
         
-        // Créer des objets simulés pour les serveurs de test
+        // Créer seulement des serveurs Garry's Mod pour les tests
         $testServers = collect([
             $this->createMockServer(1, 'Test GMod Server 1', 'Garry\'s Mod'),
-            $this->createMockServer(2, 'Test GMod Server 2', 'Source Engine')
+            $this->createMockServer(2, 'Test GMod Server 2', 'GMod'),
+            $this->createMockServer(3, 'Test GMod Server 3', 'GarrysMod')
         ]);
 
-        echo "✅ Created " . count($testServers) . " test servers\n";
+        echo "✅ Created " . count($testServers) . " Garry's Mod test servers\n";
         return $testServers;
     }
 
@@ -787,35 +824,53 @@ class LuaConsoleHookService
             $lineCounters[$serverId] = 10;
         }
 
-        // Lignes de base pour chaque serveur
-        $baseLines = [
-            "Server starting up...",
-            "Loading addons...",
-            "[ERROR] Lua script failed to load: addon 'test_addon' not found",
-            "Addon loaded successfully",
+        // Lignes spécifiques à Garry's Mod pour chaque serveur
+        $gmodLines1 = [
+            "Garry's Mod server starting up...",
+            "Loading Lua scripts and addons...",
+            "[ERROR] Lua script failed to load: addon 'wiremod' not found",
+            "Addon 'sandbox' loaded successfully",
+            "Gamemode 'sandbox' initialized",
             "Server ready for connections",
-            "[ERROR] Attempt to call nil value in function 'player_connect'",
+            "[ERROR] Attempt to call nil value in function 'player_initial_spawn'",
             "Player connected: TestPlayer",
             "[ERROR] Bad argument #1 to 'print' (string expected, got nil)",
-            "Map loaded: gm_construct",
-            "Gamemode initialized"
+            "Map loaded: gm_construct"
         ];
 
-        $baseLines2 = [
-            "Initializing Source Engine server...",
-            "Loading game files...",
+        $gmodLines2 = [
+            "GMod server initializing...",
+            "Loading workshop content...",
             "Server configuration loaded",
-            "[ERROR] Failed to load map 'de_dust2'",
-            "Map loaded successfully",
-            "Bot AI initialized",
+            "[ERROR] Failed to load workshop addon '123456789'",
+            "Workshop addon loaded successfully",
+            "Lua environment initialized",
             "[ERROR] Memory allocation failed for texture loading",
-            "Server ready",
-            "Player joined: CounterTerrorist",
-            "Round started"
+            "Server ready for players",
+            "Player joined: Builder",
+            "Gamemode started"
         ];
 
-        // Choisir les lignes selon le serveur
-        $lines = ($server->id == 1) ? $baseLines : $baseLines2;
+        $gmodLines3 = [
+            "GarrysMod server starting...",
+            "Loading custom Lua scripts...",
+            "Server settings applied",
+            "[ERROR] Lua script 'custom_script.lua' syntax error",
+            "Script loaded successfully",
+            "Physics engine initialized",
+            "[ERROR] Failed to load custom model",
+            "Server ready",
+            "Player connected: Developer",
+            "Custom gamemode loaded"
+        ];
+
+        // Choisir les lignes selon l'ID du serveur
+        $lines = match($server->id) {
+            1 => $gmodLines1,
+            2 => $gmodLines2,
+            3 => $gmodLines3,
+            default => $gmodLines1
+        };
         
         // Retourner seulement le nombre de lignes demandées
         $linesToShow = array_slice($lines, 0, $lineCounters[$serverId]);
