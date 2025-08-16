@@ -234,7 +234,7 @@ class LuaConsoleHookService
     /**
      * Vérifie la console d'un serveur spécifique
      */
-    private function checkServerConsole(Server $server): void
+    private function checkServerConsole($server): void
     {
         try {
             $consoleOutput = $this->getConsoleOutput($server);
@@ -274,8 +274,13 @@ class LuaConsoleHookService
     /**
      * Récupère la sortie de la console depuis le daemon
      */
-    private function getConsoleOutput(Server $server): string
+    private function getConsoleOutput($server): string
     {
+        // En mode debug, retourner des données de test
+        if ($this->debugMode) {
+            return $this->getTestConsoleOutput($server);
+        }
+
         try {
             $daemonUrl = $this->getDaemonUrl($server);
             $token = $this->getDaemonToken($server);
@@ -407,10 +412,17 @@ class LuaConsoleHookService
     /**
      * Traite les nouvelles erreurs détectées
      */
-    private function processNewErrors(Server $server, array $errors): void
+    private function processNewErrors($server, array $errors): void
     {
         foreach ($errors as $error) {
             try {
+                if ($this->debugMode) {
+                    // En mode debug, simuler la détection d'erreur sans base de données
+                    echo "🚨 NEW ERROR DETECTED! Server: {$server->name} - Type: {$error['type']} - Line: {$error['line']}\n";
+                    echo "   Content: {$error['content']}\n";
+                    continue;
+                }
+
                 // Vérifier si l'erreur n'a pas déjà été enregistrée
                 $existingError = LuaError::where('server_id', $server->id)
                     ->where('content', $error['content'])
@@ -441,11 +453,6 @@ class LuaConsoleHookService
                 // Envoyer une notification
                 $this->sendErrorNotification($server, $luaError);
 
-                if ($this->debugMode) {
-                    echo "🚨 NEW ERROR DETECTED! Server: {$server->name} - Type: {$error['type']} - Line: {$error['line']}\n";
-                    echo "   Content: {$error['content']}\n";
-                }
-
                 Log::info('LuaConsoleHook: New Lua error detected', [
                     'server_id' => $server->id,
                     'error_id' => $luaError->id,
@@ -465,8 +472,14 @@ class LuaConsoleHookService
     /**
      * Envoie une notification pour une nouvelle erreur
      */
-    private function sendErrorNotification(Server $server, LuaError $luaError): void
+    private function sendErrorNotification($server, $luaError): void
     {
+        // En mode debug, simuler l'envoi de notification
+        if ($this->debugMode) {
+            echo "📧 Notification sent for error on server: {$server->name}\n";
+            return;
+        }
+
         try {
             // Notifier les administrateurs du serveur
             if ($server->owner) {
@@ -492,11 +505,16 @@ class LuaConsoleHookService
     /**
      * Vérifie si un serveur est un serveur Garry's Mod
      */
-    private function isGarrysModServer(Server $server): bool
+    private function isGarrysModServer($server): bool
     {
         // En mode debug, accepter tous les serveurs pour les tests
         if ($this->debugMode) {
             return true;
+        }
+
+        // Vérifier que c'est bien un modèle Server
+        if (!$server instanceof Server) {
+            return false;
         }
 
         if (!$server->egg) {
@@ -516,7 +534,7 @@ class LuaConsoleHookService
     /**
      * Récupère l'URL du daemon pour un serveur
      */
-    private function getDaemonUrl(Server $server): string
+    private function getDaemonUrl($server): string
     {
         if (!$server->node) {
             throw new \Exception('Server has no associated node');
@@ -532,7 +550,7 @@ class LuaConsoleHookService
     /**
      * Récupère le token d'authentification du daemon
      */
-    private function getDaemonToken(Server $server): string
+    private function getDaemonToken($server): string
     {
         if (!$server->node) {
             return '';
@@ -584,39 +602,84 @@ class LuaConsoleHookService
         
         // Créer des objets simulés pour les serveurs de test
         $testServers = collect([
-            (object) [
-                'id' => 1,
-                'name' => 'Test GMod Server 1',
-                'uuid' => 'test-uuid-1',
-                'egg' => (object) ['name' => 'Garry\'s Mod'],
-                'node' => (object) [
-                    'name' => 'Test Node',
-                    'ip' => '127.0.0.1',
-                    'daemon_port' => 8080,
-                    'daemon_token' => 'test-token'
-                ]
-            ],
-            (object) [
-                'id' => 2,
-                'name' => 'Test GMod Server 2',
-                'uuid' => 'test-uuid-2',
-                'egg' => (object) ['name' => 'Source Engine'],
-                'node' => (object) [
-                    'name' => 'Test Node 2',
-                    'ip' => '127.0.0.1',
-                    'daemon_port' => 8081,
-                    'daemon_token' => 'test-token-2'
-                ]
-            ]
+            $this->createMockServer(1, 'Test GMod Server 1', 'Garry\'s Mod'),
+            $this->createMockServer(2, 'Test GMod Server 2', 'Source Engine')
         ]);
-
-        // Ajouter des méthodes simulées
-        foreach ($testServers as $server) {
-            $server->isInstalled = function() { return true; };
-            $server->isSuspended = function() { return false; };
-        }
 
         echo "✅ Created " . count($testServers) . " test servers\n";
         return $testServers;
+    }
+
+    /**
+     * Crée un serveur de test simulé
+     */
+    private function createMockServer(int $id, string $name, string $eggName): object
+    {
+        $server = new class($id, $name, $eggName) {
+            public $id;
+            public $name;
+            public $uuid;
+            public $egg;
+            public $node;
+
+            public function __construct($id, $name, $eggName) {
+                $this->id = $id;
+                $this->name = $name;
+                $this->uuid = "test-uuid-{$id}";
+                $this->egg = (object) ['name' => $eggName];
+                $this->node = (object) [
+                    'name' => "Test Node {$id}",
+                    'ip' => '127.0.0.1',
+                    'daemon_port' => 8080 + $id - 1,
+                    'daemon_token' => "test-token-{$id}"
+                ];
+            }
+
+            public function isInstalled(): bool
+            {
+                return true;
+            }
+
+            public function isSuspended(): bool
+            {
+                return false;
+            }
+        };
+
+        return $server;
+    }
+
+    /**
+     * Retourne des données de console de test pour le mode debug
+     */
+    private function getTestConsoleOutput($server): string
+    {
+        $testOutputs = [
+            "Server starting up...\n" .
+            "Loading addons...\n" .
+            "[ERROR] Lua script failed to load: addon 'test_addon' not found\n" .
+            "Addon loaded successfully\n" .
+            "Server ready for connections\n" .
+            "[ERROR] Attempt to call nil value in function 'player_connect'\n" .
+            "Player connected: TestPlayer\n" .
+            "[ERROR] Bad argument #1 to 'print' (string expected, got nil)\n" .
+            "Map loaded: gm_construct\n" .
+            "Gamemode initialized\n",
+
+            "Initializing Source Engine server...\n" .
+            "Loading game files...\n" .
+            "Server configuration loaded\n" .
+            "[ERROR] Failed to load map 'de_dust2'\n" .
+            "Map loaded successfully\n" .
+            "Bot AI initialized\n" .
+            "[ERROR] Memory allocation failed for texture loading\n" .
+            "Server ready\n" .
+            "Player joined: CounterTerrorist\n" .
+            "Round started\n"
+        ];
+
+        // Retourner des données différentes selon l'ID du serveur
+        $index = ($server->id - 1) % count($testOutputs);
+        return $testOutputs[$index];
     }
 }
