@@ -133,18 +133,7 @@ class LuaErrorLogger extends Page
                     ->dateTime('d/m/Y H:i:s')
                     ->sortable()
                     ->grow(false)
-                    ->description(fn (LuaError $record) => "Compteur: {$record->count}x")
                     ->icon('tabler-clock'),
-                
-                TextColumn::make('last_seen')
-                    ->label('Dernière fois')
-                    ->dateTime('d/m/Y H:i:s')
-                    ->sortable()
-                    ->grow(false)
-                    ->icon('tabler-refresh')
-                    ->badge()
-                    ->color(fn (LuaError $record) => $record->resolved ? 'success' : 'warning')
-                    ->label(fn (LuaError $record) => $record->resolved ? 'Résolu' : 'Ouvert'),
 
                 TextColumn::make('level')
                     ->label('Niveau')
@@ -163,13 +152,6 @@ class LuaErrorLogger extends Page
                     ->searchable()
                     ->description(fn (LuaError $record) => $record->stack_trace ? 'Stack trace disponible' : null)
                     ->icon('tabler-alert-circle'),
-
-                TextColumn::make('addon')
-                    ->label('Addon')
-                    ->badge()
-                    ->color('purple')
-                    ->grow(false)
-                    ->default('N/A'),
             ])
             ->filters([
                 SelectFilter::make('level')
