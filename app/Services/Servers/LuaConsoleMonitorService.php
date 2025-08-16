@@ -66,6 +66,54 @@ class LuaConsoleMonitorService
     }
 
     /**
+     * Force la mise à jour des compteurs pour toutes les erreurs existantes
+     */
+    public function updateExistingErrorCounts(Server $server): void
+    {
+        try {
+            $existingErrors = LuaError::where('server_id', $server->id)
+                ->where('status', 'open')
+                ->get();
+            
+            foreach ($existingErrors as $error) {
+                // Vérifier si l'erreur existe encore dans la console
+                $consoleOutput = $this->getConsoleOutput($server);
+                if (!empty($consoleOutput)) {
+                    $lines = explode("\n", $consoleOutput);
+                    $errorCount = 0;
+                    
+                    foreach ($lines as $line) {
+                        if (strpos($line, $error->message) !== false) {
+                            $errorCount++;
+                        }
+                    }
+                    
+                    // Mettre à jour le compteur si différent
+                    if ($errorCount !== $error->count) {
+                        $error->update([
+                            'count' => $errorCount,
+                            'last_seen' => now()
+                        ]);
+                        
+                        Log::info('LuaConsoleMonitor: Error count updated', [
+                            'server_id' => $server->id,
+                            'error_id' => $error->id,
+                            'old_count' => $error->count,
+                            'new_count' => $errorCount
+                        ]);
+                    }
+                }
+            }
+            
+        } catch (\Exception $e) {
+            Log::error('LuaConsoleMonitor: Failed to update error counts', [
+                'server_id' => $server->id,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
      * Récupère la sortie de la console depuis le daemon
      */
     private function getConsoleOutput(Server $server): string
@@ -211,8 +259,29 @@ class LuaConsoleMonitorService
      */
     private function isLuaError(string $line): bool
     {
-        // Les erreurs Lua commencent par [ERROR]
-        return Str::startsWith($line, '[ERROR]');
+        // Patterns d'erreurs Lua plus larges
+        $errorPatterns = [
+            '/^\[ERROR\]/i',                    // [ERROR]
+            '/^\[.*?\]\s*\[ERROR\]/i',          // [timestamp] [ERROR]
+            '/^\[.*?\]\s*Lua Error:/i',         // [timestamp] Lua Error:
+            '/^\[.*?\]\s*Script Error:/i',      // [timestamp] Script Error:
+            '/^\[.*?\]\s*Runtime Error:/i',     // [timestamp] Runtime Error:
+            '/^\[.*?\]\s*Syntax Error:/i',      // [timestamp] Syntax Error:
+            '/^\[.*?\]\s*Compile Error:/i',     // [timestamp] Compile Error:
+            '/^\[.*?\]\s*Failed to load/i',     // [timestamp] Failed to load
+            '/^\[.*?\]\s*Failed to execute/i',  // [timestamp] Failed to execute
+            '/^\[.*?\]\s*Cannot open/i',        // [timestamp] Cannot open
+            '/^\[.*?\]\s*Permission denied/i',  // [timestamp] Permission denied
+            '/^\[.*?\]\s*File not found/i',     // [timestamp] File not found
+        ];
+        
+        foreach ($errorPatterns as $pattern) {
+            if (preg_match($pattern, $line)) {
+                return true;
+            }
+        }
+        
+        return false;
     }
 
     /**
@@ -291,30 +360,36 @@ class LuaConsoleMonitorService
         foreach ($errors as $error) {
             try {
                 // Créer une clé unique pour cette erreur
-                $errorKey = md5($error['message'] . '|' . $error['addon']);
+                // Utiliser seulement le message pour détecter les erreurs similaires
+                $errorKey = md5($error['message']);
                 
                 // Vérifier si l'erreur existe déjà
                 $existingError = LuaError::where('error_key', $errorKey)
                     ->where('server_id', $server->id)
-                    ->where('status', 'open')
                     ->first();
                 
                 if ($existingError) {
-                    // Erreur existante, incrémenter le compteur
+                    // Erreur existante, incrémenter le compteur et mettre à jour last_seen
                     $existingError->increment('count');
                     $existingError->update(['last_seen' => now()]);
                     
                     Log::info('LuaConsoleMonitor: Existing error updated', [
                         'server_id' => $server->id,
                         'error_key' => $errorKey,
-                        'new_count' => $existingError->count + 1
+                        'old_count' => $existingError->count - 1,
+                        'new_count' => $existingError->count,
+                        'message' => substr($error['message'], 0, 100)
                     ]);
+                    
+                    // Ajouter à la liste des erreurs mises à jour
+                    $newErrors[] = $existingError;
+                    
                 } else {
                     // Nouvelle erreur, la créer
                     $luaError = LuaError::create([
                         'server_id' => $server->id,
                         'error_key' => $errorKey,
-                        'level' => $error['level'],
+                        'level' => strtoupper($error['level']),
                         'message' => $error['message'],
                         'addon' => $error['addon'],
                         'stack_trace' => $error['stack_trace'],
@@ -331,12 +406,14 @@ class LuaConsoleMonitorService
                     
                     // Envoyer une notification au propriétaire du serveur
                     try {
-                        $server->user->notify(new LuaErrorDetected($server, $luaError));
-                        Log::info('LuaConsoleMonitor: Notification sent for new error', [
-                            'server_id' => $server->id,
-                            'user_id' => $server->user->id,
-                            'error_id' => $luaError->id
-                        ]);
+                        if ($server->user) {
+                            $server->user->notify(new LuaErrorDetected($server, $luaError));
+                            Log::info('LuaConsoleMonitor: Notification sent for new error', [
+                                'server_id' => $server->id,
+                                'user_id' => $server->user->id,
+                                'error_id' => $luaError->id
+                            ]);
+                        }
                     } catch (\Exception $e) {
                         Log::warning('LuaConsoleMonitor: Failed to send notification', [
                             'server_id' => $server->id,

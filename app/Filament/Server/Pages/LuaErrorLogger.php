@@ -7,6 +7,15 @@ use App\Models\LuaError;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Pages\Page;
+use Filament\Tables\Table;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Actions\Action as TableAction;
+use Filament\Tables\Actions\BulkAction;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\Filter;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\DatePicker;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -107,6 +116,202 @@ class LuaErrorLogger extends Page
     public function getServer(): Server
     {
         return \Filament\Facades\Filament::getTenant();
+    }
+
+    /**
+     * Configure le tableau Filament
+     */
+    public function table(Table $table): Table
+    {
+        return $table
+            ->query(
+                LuaError::query()->where('server_id', $this->getServer()->id)
+            )
+            ->columns([
+                TextColumn::make('first_seen')
+                    ->label('Première fois')
+                    ->dateTime('d/m/Y H:i:s')
+                    ->sortable()
+                    ->grow(false)
+                    ->description(fn (LuaError $record) => "Compteur: {$record->count}x")
+                    ->icon('tabler-clock'),
+                
+                TextColumn::make('last_seen')
+                    ->label('Dernière fois')
+                    ->dateTime('d/m/Y H:i:s')
+                    ->sortable()
+                    ->grow(false)
+                    ->icon('tabler-refresh')
+                    ->badge()
+                    ->color(fn (LuaError $record) => $record->resolved ? 'success' : 'warning')
+                    ->label(fn (LuaError $record) => $record->resolved ? 'Résolu' : 'Ouvert'),
+
+                TextColumn::make('level')
+                    ->label('Niveau')
+                    ->badge()
+                    ->color(fn (string $state) => match($state) {
+                        'ERROR' => 'danger',
+                        'WARNING' => 'warning',
+                        'INFO' => 'info',
+                        default => 'gray'
+                    })
+                    ->grow(false),
+
+                TextColumn::make('message')
+                    ->label('Message d\'erreur')
+                    ->limit(80)
+                    ->searchable()
+                    ->description(fn (LuaError $record) => $record->stack_trace ? 'Stack trace disponible' : null)
+                    ->icon('tabler-alert-circle'),
+
+                TextColumn::make('addon')
+                    ->label('Addon')
+                    ->badge()
+                    ->color('purple')
+                    ->grow(false)
+                    ->default('N/A'),
+            ])
+            ->filters([
+                SelectFilter::make('level')
+                    ->label('Niveau')
+                    ->options([
+                        'all' => 'Tous les niveaux',
+                        'ERROR' => 'Erreur',
+                        'WARNING' => 'Avertissement',
+                        'INFO' => 'Information'
+                    ])
+                    ->query(function ($query, array $data) {
+                        if ($data['value'] !== 'all') {
+                            $query->where('level', $data['value']);
+                        }
+                    }),
+
+                SelectFilter::make('resolved')
+                    ->label('Statut')
+                    ->options([
+                        'false' => 'Non résolues',
+                        'true' => 'Résolues',
+                        'all' => 'Toutes'
+                    ])
+                    ->query(function ($query, array $data) {
+                        if ($data['value'] !== 'all') {
+                            $query->where('resolved', $data['value'] === 'true');
+                        }
+                    }),
+
+                Filter::make('search')
+                    ->form([
+                        TextInput::make('search')
+                            ->label('Rechercher')
+                            ->placeholder('Rechercher dans les messages ou addons...')
+                    ])
+                    ->query(function ($query, array $data) {
+                        if (!empty($data['search'])) {
+                            $query->where(function($q) use ($data) {
+                                $q->where('message', 'like', '%' . $data['search'] . '%')
+                                  ->orWhere('addon', 'like', '%' . $data['search'] . '%');
+                            });
+                        }
+                    }),
+
+                Filter::make('time')
+                    ->form([
+                        Select::make('time_filter')
+                            ->label('Période')
+                            ->options([
+                                'all' => 'Toute la période',
+                                'today' => 'Aujourd\'hui',
+                                'week' => 'Cette semaine',
+                                'month' => 'Ce mois'
+                            ])
+                    ])
+                    ->query(function ($query, array $data) {
+                        if ($data['time_filter'] !== 'all') {
+                            $timeRanges = [
+                                'today' => now()->startOfDay(),
+                                'week' => now()->subWeek(),
+                                'month' => now()->subMonth(),
+                            ];
+                            
+                            if (isset($timeRanges[$data['time_filter']])) {
+                                $query->where('first_seen', '>=', $timeRanges[$data['time_filter']]);
+                            }
+                        }
+                    }),
+            ])
+            ->actions([
+                TableAction::make('resolve')
+                    ->label('Résoudre')
+                    ->icon('tabler-check')
+                    ->color('success')
+                    ->visible(fn (LuaError $record) => !$record->resolved)
+                    ->action(fn (LuaError $record) => $this->markAsResolved($record->error_key))
+                    ->requiresConfirmation()
+                    ->modalHeading('Marquer comme résolu')
+                    ->modalDescription('Êtes-vous sûr de vouloir marquer cette erreur comme résolue ?')
+                    ->modalSubmitActionLabel('Résoudre'),
+
+                TableAction::make('unresolve')
+                    ->label('Rouvrir')
+                    ->icon('tabler-x')
+                    ->color('warning')
+                    ->visible(fn (LuaError $record) => $record->resolved)
+                    ->action(fn (LuaError $record) => $this->markAsUnresolved($record->error_key))
+                    ->requiresConfirmation()
+                    ->modalHeading('Rouvrir l\'erreur')
+                    ->modalDescription('Êtes-vous sûr de vouloir rouvrir cette erreur ?')
+                    ->modalSubmitActionLabel('Rouvrir'),
+
+                TableAction::make('delete')
+                    ->label('Supprimer')
+                    ->icon('tabler-trash')
+                    ->color('danger')
+                    ->action(fn (LuaError $record) => $this->deleteError($record->error_key))
+                    ->requiresConfirmation()
+                    ->modalHeading('Supprimer l\'erreur')
+                    ->modalDescription('Êtes-vous sûr de vouloir supprimer cette erreur ? Cette action est irréversible.')
+                    ->modalSubmitActionLabel('Supprimer'),
+
+                TableAction::make('view')
+                    ->label('Voir détails')
+                    ->icon('tabler-eye')
+                    ->color('info')
+                    ->modalContent(fn (LuaError $record) => view('filament.server.modals.lua-error-details', ['error' => $record]))
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Fermer'),
+            ])
+            ->bulkActions([
+                BulkAction::make('resolve_selected')
+                    ->label('Résoudre la sélection')
+                    ->icon('tabler-check')
+                    ->color('success')
+                    ->action(function ($records) {
+                        foreach ($records as $record) {
+                            $this->markAsResolved($record->error_key);
+                        }
+                    })
+                    ->requiresConfirmation()
+                    ->modalHeading('Résoudre les erreurs sélectionnées')
+                    ->modalDescription('Êtes-vous sûr de vouloir marquer ces erreurs comme résolues ?')
+                    ->modalSubmitActionLabel('Résoudre'),
+
+                BulkAction::make('delete_selected')
+                    ->label('Supprimer la sélection')
+                    ->icon('tabler-trash')
+                    ->color('danger')
+                    ->action(function ($records) {
+                        foreach ($records as $record) {
+                            $this->deleteError($record->error_key);
+                        }
+                    })
+                    ->requiresConfirmation()
+                    ->modalHeading('Supprimer les erreurs sélectionnées')
+                    ->modalDescription('Êtes-vous sûr de vouloir supprimer ces erreurs ? Cette action est irréversible.')
+                    ->modalSubmitActionLabel('Supprimer'),
+            ])
+            ->defaultSort('first_seen', 'desc')
+            ->paginated([25, 50, 100])
+            ->defaultPaginationPageOption(25);
     }
 
     /**

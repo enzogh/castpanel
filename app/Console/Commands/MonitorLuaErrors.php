@@ -81,13 +81,20 @@ class MonitorLuaErrors extends Command
         
         $this->info("✅ Server {$server->name} is Garry's Mod, starting monitoring...");
         
+        // Mettre à jour les compteurs des erreurs existantes
+        $this->info("📊 Updating existing error counts...");
+        $monitorService->updateExistingErrorCounts($server);
+        
+        // Surveiller la console pour de nouvelles erreurs
+        $this->info("🔍 Monitoring console for new errors...");
         $newErrors = $monitorService->monitorConsole($server);
         
         if (count($newErrors) > 0) {
-            $this->info("🚨 Found " . count($newErrors) . " new Lua error(s) on server {$server->name}");
+            $this->info("🚨 Found " . count($newErrors) . " new/updated Lua error(s) on server {$server->name}");
             
             foreach ($newErrors as $error) {
-                $this->line("  • " . substr($error['message'], 0, 80) . "...");
+                $countText = isset($error->count) ? " (Count: {$error->count})" : "";
+                $this->line("  • " . substr($error->message ?? $error['message'] ?? 'Unknown error', 0, 80) . "..." . $countText);
             }
         } else {
             $this->info("✅ No new Lua errors found on server {$server->name}");
