@@ -14,6 +14,8 @@ return new class extends Migration
         Schema::table('servers', function (Blueprint $table) {
             $table->boolean('lua_error_control_enabled')->default(true)->after('updated_at');
             $table->text('lua_error_control_reason')->nullable()->after('lua_error_control_enabled');
+            $table->boolean('lua_error_logging_enabled')->default(true)->after('lua_error_control_reason');
+            $table->text('lua_error_logging_reason')->nullable()->after('lua_error_logging_enabled');
         });
     }
 
@@ -23,7 +25,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('servers', function (Blueprint $table) {
-            $table->dropColumn(['lua_error_control_enabled', 'lua_error_control_reason']);
+            $table->dropColumn(['lua_error_control_enabled', 'lua_error_control_reason', 'lua_error_logging_enabled', 'lua_error_logging_reason']);
         });
     }
 };

@@ -88,6 +88,15 @@ class MonitorLuaErrors extends Command
             }
             return;
         }
+
+        // Vérifier si le logging des erreurs Lua est activé
+        if (!$server->lua_error_logging_enabled) {
+            $this->warn("⚠️  Server {$server->name} has Lua error logging disabled - skipping");
+            if ($server->lua_error_logging_reason) {
+                $this->line("   Reason: {$server->lua_error_logging_reason}");
+            }
+            return;
+        }
         
         $this->info("✅ Server {$server->name} is Garry's Mod with Lua control enabled, starting monitoring...");
         
@@ -122,27 +131,45 @@ class MonitorLuaErrors extends Command
             ->whereHas('egg', function ($query) {
                 $query->where('name', 'Garrys Mod');
             })
+            ->where('lua_error_logging_enabled', true)
             ->where('lua_error_control_enabled', true)
             ->get();
         
         if ($servers->isEmpty()) {
-            $this->warn("⚠️  No Garry's Mod servers with Lua error control enabled found");
+            $this->warn("⚠️  No Garry's Mod servers with Lua error logging and control enabled found");
             return;
         }
         
-        $this->info("✅ Found " . $servers->count() . " Garry's Mod server(s) with Lua control enabled");
+        $this->info("✅ Found " . $servers->count() . " Garry's Mod server(s) with Lua logging and control enabled");
         
-        // Afficher les serveurs qui ont désactivé le contrôle
-        $disabledServers = Server::with('egg')
+        // Afficher les serveurs qui ont désactivé le logging
+        $disabledLoggingServers = Server::with('egg')
             ->whereHas('egg', function ($query) {
                 $query->where('name', 'Garrys Mod');
             })
+            ->where('lua_error_logging_enabled', false)
+            ->get();
+        
+        if ($disabledLoggingServers->isNotEmpty()) {
+            $this->warn("⚠️  Found " . $disabledLoggingServers->count() . " Garry's Mod server(s) with Lua logging disabled:");
+            foreach ($disabledLoggingServers as $server) {
+                $reason = $server->lua_error_logging_reason ? " ({$server->lua_error_logging_reason})" : "";
+                $this->line("   • {$server->name}{$reason}");
+            }
+        }
+        
+        // Afficher les serveurs qui ont désactivé le contrôle
+        $disabledControlServers = Server::with('egg')
+            ->whereHas('egg', function ($query) {
+                $query->where('name', 'Garrys Mod');
+            })
+            ->where('lua_error_logging_enabled', true)
             ->where('lua_error_control_enabled', false)
             ->get();
         
-        if ($disabledServers->isNotEmpty()) {
-            $this->warn("⚠️  Found " . $disabledServers->count() . " Garry's Mod server(s) with Lua control disabled:");
-            foreach ($disabledServers as $server) {
+        if ($disabledControlServers->isNotEmpty()) {
+            $this->warn("⚠️  Found " . $disabledControlServers->count() . " Garry's Mod server(s) with Lua control disabled:");
+            foreach ($disabledControlServers as $server) {
                 $reason = $server->lua_error_control_reason ? " ({$server->lua_error_control_reason})" : "";
                 $this->line("   • {$server->name}{$reason}");
             }

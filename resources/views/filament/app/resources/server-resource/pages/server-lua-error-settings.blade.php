@@ -32,27 +32,34 @@
         <!-- Informations supplémentaires -->
         <div class="max-w-2xl">
             <div class="rounded-lg border bg-card p-6">
-                <h3 class="text-lg font-semibold mb-4">Informations sur le contrôle des erreurs Lua</h3>
+                <h3 class="text-lg font-semibold mb-4">Informations sur la gestion des erreurs Lua</h3>
                 
                 <div class="space-y-4 text-sm text-muted-foreground">
                     <div class="flex items-start gap-3">
                         <div class="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
                         <div>
-                            <strong>Quand activé :</strong> Vous pouvez voir, résoudre et supprimer les erreurs Lua de votre serveur en temps réel.
+                            <strong>Collecte activée + Contrôle activé :</strong> Vous pouvez voir, résoudre et supprimer les erreurs Lua de votre serveur en temps réel.
                         </div>
                     </div>
                     
                     <div class="flex items-start gap-3">
                         <div class="w-2 h-2 bg-orange-500 rounded-full mt-2 flex-shrink-0"></div>
                         <div>
-                            <strong>Quand désactivé :</strong> Les erreurs sont toujours collectées et analysées, mais vous ne pouvez pas les gérer directement.
+                            <strong>Collecte activée + Contrôle désactivé :</strong> Les erreurs sont collectées et analysées, mais vous ne pouvez pas les gérer directement.
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-start gap-3">
+                        <div class="w-2 h-2 bg-red-500 rounded-full mt-2 flex-shrink-0"></div>
+                        <div>
+                            <strong>Collecte désactivée :</strong> Aucune erreur Lua n'est collectée, analysée ou stockée. Le serveur n'est pas surveillé.
                         </div>
                     </div>
                     
                     <div class="flex items-start gap-3">
                         <div class="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
                         <div>
-                            <strong>Recommandé :</strong> Gardez activé pour maintenir la qualité de votre serveur, désactivez temporairement si nécessaire.
+                            <strong>Recommandé :</strong> Gardez la collecte activée pour maintenir la qualité de votre serveur. Désactivez temporairement si nécessaire.
                         </div>
                     </div>
                 </div>

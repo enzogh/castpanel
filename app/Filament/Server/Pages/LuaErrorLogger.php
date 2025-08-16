@@ -151,6 +151,28 @@ class LuaErrorLogger extends Page implements HasTable
                 ->paginated([10])
                 ->defaultPaginationPageOption(10);
         }
+
+        // Vérifier si le logging des erreurs Lua est activé
+        if (!$server->lua_error_logging_enabled) {
+            // Rediriger vers une page d'information ou afficher un message
+            $this->dispatch('notify', [
+                'status' => 'warning',
+                'message' => 'La collecte des erreurs Lua est désactivée pour ce serveur. Aucune erreur ne sera collectée.'
+            ]);
+            
+            // Retourner un tableau vide
+            return $table
+                ->query(LuaError::query()->where('id', 0)) // Requête vide
+                ->columns([
+                    TextColumn::make('id')
+                        ->label('Collecte désactivée')
+                        ->grow(false),
+                ])
+                ->actions([])
+                ->defaultSort('id', 'desc')
+                ->paginated([10])
+                ->defaultPaginationPageOption(10);
+        }
         
         // Debug temporaire
         Log::info('LuaErrorLogger Debug - Server ID', ['server_id' => $serverId]);

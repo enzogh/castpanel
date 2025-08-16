@@ -31,6 +31,8 @@ class ServerLuaErrorSettings extends Page
         $this->form->fill([
             'lua_error_control_enabled' => $server->lua_error_control_enabled ?? true,
             'lua_error_control_reason' => $server->lua_error_control_reason,
+            'lua_error_logging_enabled' => $server->lua_error_logging_enabled ?? true,
+            'lua_error_logging_reason' => $server->lua_error_logging_reason,
         ]);
     }
 
@@ -38,6 +40,25 @@ class ServerLuaErrorSettings extends Page
     {
         return $form
             ->schema([
+                Section::make('Collecte des erreurs Lua')
+                    ->description('Configurez si vous souhaitez collecter les erreurs Lua de votre serveur.')
+                    ->schema([
+                        Toggle::make('lua_error_logging_enabled')
+                            ->label('Activer la collecte des erreurs Lua')
+                            ->helperText('Quand activé, les erreurs Lua de votre serveur seront collectées et analysées. Quand désactivé, aucune erreur ne sera collectée.')
+                            ->default(true)
+                            ->required()
+                            ->reactive(),
+
+                        Textarea::make('lua_error_logging_reason')
+                            ->label('Raison de la désactivation (optionnel)')
+                            ->helperText('Si vous désactivez la collecte, vous pouvez expliquer pourquoi (ex: serveur en production, performance, etc.)')
+                            ->placeholder('Ex: Serveur en production, problèmes de performance...')
+                            ->rows(3)
+                            ->visible(fn ($get) => !$get('lua_error_logging_enabled')),
+                    ])
+                    ->columns(1),
+
                 Section::make('Contrôle des erreurs Lua')
                     ->description('Configurez si vous souhaitez activer le contrôle des erreurs Lua pour ce serveur.')
                     ->schema([
@@ -45,14 +66,15 @@ class ServerLuaErrorSettings extends Page
                             ->label('Activer le contrôle des erreurs Lua')
                             ->helperText('Quand activé, vous pourrez voir et gérer les erreurs Lua de votre serveur. Quand désactivé, les erreurs seront toujours collectées mais vous ne pourrez pas les contrôler.')
                             ->default(true)
-                            ->required(),
+                            ->required()
+                            ->disabled(fn ($get) => !$get('lua_error_logging_enabled')),
 
                         Textarea::make('lua_error_control_reason')
                             ->label('Raison de la désactivation (optionnel)')
                             ->helperText('Si vous désactivez le contrôle, vous pouvez expliquer pourquoi (ex: serveur en maintenance, erreurs trop nombreuses, etc.)')
                             ->placeholder('Ex: Serveur en maintenance, erreurs trop nombreuses...')
                             ->rows(3)
-                            ->visible(fn ($get) => !$get('lua_error_control_enabled')),
+                            ->visible(fn ($get) => $get('lua_error_logging_enabled') && !$get('lua_error_control_enabled')),
                     ])
                     ->columns(1),
             ]);
@@ -87,6 +109,8 @@ class ServerLuaErrorSettings extends Page
 
         try {
             $server->update([
+                'lua_error_logging_enabled' => $data['lua_error_logging_enabled'],
+                'lua_error_logging_reason' => $data['lua_error_logging_enabled'] ? null : $data['lua_error_logging_reason'],
                 'lua_error_control_enabled' => $data['lua_error_control_enabled'],
                 'lua_error_control_reason' => $data['lua_error_control_enabled'] ? null : $data['lua_error_control_reason'],
             ]);

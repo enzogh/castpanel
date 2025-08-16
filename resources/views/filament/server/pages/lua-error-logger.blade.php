@@ -19,14 +19,6 @@
                 >
                     {{ __('Vider tous les logs') }}
                 </x-filament::button>
-                
-                <x-filament::button
-                    wire:click="exportLogs"
-                    color="success"
-                    icon="tabler-download"
-                >
-                    {{ __('Exporter') }}
-                </x-filament::button>
             </div>
         </div>
 
