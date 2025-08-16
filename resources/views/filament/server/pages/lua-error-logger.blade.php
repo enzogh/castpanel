@@ -62,7 +62,46 @@
                         <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Afficher résolues</span>
                     </label>
                 </div>
+
+                <!-- Bouton de test -->
+                <div>
+                    <button
+                        wire:click="testDatabase"
+                        class="px-3 py-2 text-sm rounded-md bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 hover:bg-orange-200 dark:hover:bg-orange-800 transition-colors"
+                        title="Tester la base de données"
+                    >
+                        🔍 Test DB
+                    </button>
+                </div>
             </div>
+
+            <!-- Informations de debug -->
+            @if(session('debug_info'))
+                @php $debugInfo = session('debug_info'); @endphp
+                <div class="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
+                    <h4 class="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">🔍 Informations de debug :</h4>
+                    <div class="text-xs text-blue-700 dark:text-blue-300 space-y-1">
+                        <p><strong>Server ID :</strong> {{ $debugInfo['server_id'] }}</p>
+                        <p><strong>Erreurs pour ce serveur :</strong> {{ $debugInfo['total_errors_for_server'] }}</p>
+                        <p><strong>Total erreurs en base :</strong> {{ $debugInfo['total_errors_in_table'] }}</p>
+                        @if($debugInfo['sample_errors'])
+                            <p><strong>Exemples d'erreurs :</strong></p>
+                            <ul class="ml-4 space-y-1">
+                                @foreach($debugInfo['sample_errors'] as $error)
+                                    <li>ID: {{ $error['id'] }} - {{ Str::limit($error['message'], 50) }}</li>
+                                @endforeach
+                            </ul>
+                        @endif
+                    </div>
+                </div>
+            @endif
+
+            @if(session('debug_error'))
+                <div class="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg">
+                    <h4 class="text-sm font-medium text-red-800 dark:text-red-200 mb-2">❌ Erreur de debug :</h4>
+                    <p class="text-xs text-red-700 dark:text-red-300">{{ session('debug_error') }}</p>
+                </div>
+            @endif
         </div>
 
         <!-- Tableau des erreurs -->

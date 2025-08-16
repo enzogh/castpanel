@@ -77,7 +77,16 @@ class LuaErrorLogger extends Page
     public function getLogs(): array
     {
         try {
-            $query = LuaError::where('server_id', $this->getServer()->id);
+            $serverId = $this->getServer()->id;
+            
+            // Debug: afficher l'ID du serveur
+            Log::info('Livewire: Getting logs for server', ['server_id' => $serverId]);
+            
+            $query = LuaError::where('server_id', $serverId);
+
+            // Debug: compter le total avant filtres
+            $totalBeforeFilters = $query->count();
+            Log::info('Livewire: Total errors before filters', ['count' => $totalBeforeFilters]);
 
             // Filtre de recherche
             if (!empty($this->search)) {
@@ -112,15 +121,18 @@ class LuaErrorLogger extends Page
 
             $logs = $query->orderBy('first_seen', 'desc')->get()->toArray();
 
+            // Debug: afficher le résultat final
             Log::info('Livewire: Logs retrieved successfully', [
-                'server_id' => $this->getServer()->id,
+                'server_id' => $serverId,
+                'total_before_filters' => $totalBeforeFilters,
                 'logs_count' => count($logs),
                 'show_resolved' => $this->showResolved,
                 'filters' => [
                     'search' => $this->search,
                     'level' => $this->levelFilter,
                     'time' => $this->timeFilter
-                ]
+                ],
+                'first_log' => $logs[0] ?? 'no logs'
             ]);
 
             return $logs;
@@ -128,7 +140,8 @@ class LuaErrorLogger extends Page
         } catch (\Exception $e) {
             Log::error('Livewire: Failed to retrieve logs', [
                 'server_id' => $this->getServer()->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
 
             return [];
@@ -353,6 +366,51 @@ class LuaErrorLogger extends Page
         }
 
         return $text;
+    }
+
+    /**
+     * Méthode de test pour vérifier la base de données
+     */
+    public function testDatabase(): void
+    {
+        try {
+            $serverId = $this->getServer()->id;
+            
+            // Vérifier le total d'erreurs pour ce serveur
+            $totalErrors = LuaError::where('server_id', $serverId)->count();
+            
+            // Vérifier quelques erreurs
+            $sampleErrors = LuaError::where('server_id', $serverId)
+                ->limit(5)
+                ->get(['id', 'message', 'addon', 'first_seen', 'resolved']);
+            
+            // Vérifier toutes les erreurs (sans filtres)
+            $allErrors = LuaError::all(['id', 'server_id', 'message']);
+            
+            Log::info('Livewire: Database test results', [
+                'server_id' => $serverId,
+                'total_errors_for_server' => $totalErrors,
+                'sample_errors' => $sampleErrors->toArray(),
+                'total_errors_in_table' => $allErrors->count(),
+                'all_errors_server_ids' => $allErrors->pluck('server_id')->unique()->toArray()
+            ]);
+            
+            // Afficher dans la session pour debug
+            session()->flash('debug_info', [
+                'server_id' => $serverId,
+                'total_errors_for_server' => $totalErrors,
+                'total_errors_in_table' => $allErrors->count(),
+                'sample_errors' => $sampleErrors->toArray()
+            ]);
+            
+        } catch (\Exception $e) {
+            Log::error('Livewire: Database test failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            session()->flash('debug_error', $e->getMessage());
+        }
     }
 
     protected function getHeaderActions(): array
