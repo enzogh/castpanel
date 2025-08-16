@@ -128,15 +128,38 @@ class LuaErrorLogger extends Page implements HasTable
     public function table(Table $table): Table
     {
         $serverId = $this->getServer()->id;
+        $server = $this->getServer();
+        
+        // Vérifier si le contrôle des erreurs Lua est activé
+        if (!$server->lua_error_control_enabled) {
+            // Rediriger vers une page d'information ou afficher un message
+            $this->dispatch('notify', [
+                'status' => 'warning',
+                'message' => 'Le contrôle des erreurs Lua est désactivé pour ce serveur. Contactez l\'administrateur pour l\'activer.'
+            ]);
+            
+            // Retourner un tableau vide
+            return $table
+                ->query(LuaError::query()->where('id', 0)) // Requête vide
+                ->columns([
+                    TextColumn::make('id')
+                        ->label('Contrôle désactivé')
+                        ->grow(false),
+                ])
+                ->actions([])
+                ->defaultSort('id', 'desc')
+                ->paginated([10])
+                ->defaultPaginationPageOption(10);
+        }
         
         // Debug temporaire
         Log::info('LuaErrorLogger Debug - Server ID', ['server_id' => $serverId]);
         
         // Vérifier si le serveur existe
-        $server = $this->getServer();
         Log::info('LuaErrorLogger Debug - Server object', [
             'server_exists' => $server ? 'yes' : 'no',
-            'server_class' => $server ? get_class($server) : 'null'
+            'server_class' => $server ? get_class($server) : 'null',
+            'lua_error_control_enabled' => $server->lua_error_control_enabled ?? 'null'
         ]);
         
         // Vérifier la table lua_errors

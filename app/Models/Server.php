@@ -56,6 +56,8 @@ use App\Services\Subusers\SubuserDeletionService;
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property \Illuminate\Support\Carbon|null $installed_at
+ * @property bool $lua_error_control_enabled
+ * @property string|null $lua_error_control_reason
  * @property \Illuminate\Database\Eloquent\Collection|\App\Models\ActivityLog[] $activity
  * @property int|null $activity_count
  * @property \App\Models\Allocation|null $allocation
@@ -179,6 +181,8 @@ class Server extends Model implements Validatable
         'database_limit' => ['present', 'nullable', 'integer', 'min:0'],
         'allocation_limit' => ['sometimes', 'nullable', 'integer', 'min:0'],
         'backup_limit' => ['present', 'nullable', 'integer', 'min:0'],
+        'lua_error_control_enabled' => ['sometimes', 'boolean'],
+        'lua_error_control_reason' => ['sometimes', 'nullable', 'string', 'max:1000'],
     ];
 
     protected function casts(): array
@@ -199,6 +203,8 @@ class Server extends Model implements Validatable
             'database_limit' => 'integer',
             'allocation_limit' => 'integer',
             'backup_limit' => 'integer',
+            'lua_error_control_enabled' => 'boolean',
+            'lua_error_control_reason' => 'string',
             self::CREATED_AT => 'datetime',
             self::UPDATED_AT => 'datetime',
             'installed_at' => 'datetime',

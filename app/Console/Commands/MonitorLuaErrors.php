@@ -21,7 +21,7 @@ class MonitorLuaErrors extends Command
      *
      * @var string
      */
-    protected $description = 'Monitor Garry\'s Mod servers for Lua errors in background';
+    protected $description = 'Monitor Garry\'s Mod servers with Lua error control enabled for Lua errors in background';
 
     /**
      * Execute the console command.
@@ -74,12 +74,22 @@ class MonitorLuaErrors extends Command
     {
         $this->info("🔍 Monitoring server: {$server->name} (ID: {$server->id})");
         
+        // Vérifier si c'est un serveur Garry's Mod
         if (!$server->egg || $server->egg->name !== 'Garrys Mod') {
-            $this->warn("⚠️  Server {$server->name} is not a Garry's Mod server");
+            $this->warn("⚠️  Server {$server->name} is not a Garry's Mod server - skipping");
             return;
         }
         
-        $this->info("✅ Server {$server->name} is Garry's Mod, starting monitoring...");
+        // Vérifier si le contrôle des erreurs Lua est activé
+        if (!$server->lua_error_control_enabled) {
+            $this->warn("⚠️  Server {$server->name} has Lua error control disabled - skipping");
+            if ($server->lua_error_control_reason) {
+                $this->line("   Reason: {$server->lua_error_control_reason}");
+            }
+            return;
+        }
+        
+        $this->info("✅ Server {$server->name} is Garry's Mod with Lua control enabled, starting monitoring...");
         
         // Mettre à jour les compteurs des erreurs existantes
         $this->info("📊 Updating existing error counts...");
@@ -106,23 +116,41 @@ class MonitorLuaErrors extends Command
      */
     private function monitorAllServers(LuaConsoleMonitorService $monitorService): void
     {
-        $this->info("🔍 Finding all Garry's Mod servers...");
+        $this->info("🔍 Finding all Garry's Mod servers with Lua error control enabled...");
         
         $servers = Server::with('egg')
             ->whereHas('egg', function ($query) {
                 $query->where('name', 'Garrys Mod');
             })
+            ->where('lua_error_control_enabled', true)
             ->get();
         
         if ($servers->isEmpty()) {
-            $this->warn("⚠️  No Garry's Mod servers found");
+            $this->warn("⚠️  No Garry's Mod servers with Lua error control enabled found");
             return;
         }
         
-        $this->info("✅ Found " . $servers->count() . " Garry's Mod server(s)");
+        $this->info("✅ Found " . $servers->count() . " Garry's Mod server(s) with Lua control enabled");
+        
+        // Afficher les serveurs qui ont désactivé le contrôle
+        $disabledServers = Server::with('egg')
+            ->whereHas('egg', function ($query) {
+                $query->where('name', 'Garrys Mod');
+            })
+            ->where('lua_error_control_enabled', false)
+            ->get();
+        
+        if ($disabledServers->isNotEmpty()) {
+            $this->warn("⚠️  Found " . $disabledServers->count() . " Garry's Mod server(s) with Lua control disabled:");
+            foreach ($disabledServers as $server) {
+                $reason = $server->lua_error_control_reason ? " ({$server->lua_error_control_reason})" : "";
+                $this->line("   • {$server->name}{$reason}");
+            }
+        }
         
         $totalErrors = 0;
         $monitoredServers = 0;
+        $skippedServers = 0;
         
         foreach ($servers as $server) {
             try {
@@ -150,6 +178,7 @@ class MonitorLuaErrors extends Command
         
         $this->info("📊 Monitoring summary:");
         $this->line("  • Servers monitored: {$monitoredServers}");
+        $this->line("  • Servers skipped (control disabled): {$skippedServers}");
         $this->line("  • Total new errors: {$totalErrors}");
     }
 }
