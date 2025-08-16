@@ -1,159 +1,99 @@
 <x-filament-panels::page class="fi-lua-error-logger-page">
     <div class="space-y-6">
-        <!-- Message d'erreur de base de données -->
-        <div id="database-error-message" class="hidden bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-4 mb-4">
-            <div class="flex items-center">
-                <svg class="w-2 h-2 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                </svg>
-                <span class="text-red-800 dark:text-red-200 font-medium">Erreur de connexion à la base de données</span>
+        <!-- Filtres et recherche -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+            <div class="flex flex-wrap items-center gap-4">
+                <!-- Recherche -->
+                <div class="flex-1 min-w-64">
+                    <label for="search" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Rechercher
+                    </label>
+                    <input
+                        type="text"
+                        id="search"
+                        wire:model.live.debounce.300ms="search"
+                        placeholder="Rechercher dans les messages ou addons..."
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                    >
+                </div>
+
+                <!-- Filtre de niveau -->
+                <div>
+                    <label for="levelFilter" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Niveau
+                    </label>
+                    <select
+                        id="levelFilter"
+                        wire:model.live="levelFilter"
+                        class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                    >
+                        <option value="all">Tous les niveaux</option>
+                        <option value="ERROR">Erreur</option>
+                        <option value="WARNING">Avertissement</option>
+                        <option value="INFO">Information</option>
+                    </select>
+                </div>
+
+                <!-- Filtre de temps -->
+                <div>
+                    <label for="timeFilter" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Période
+                    </label>
+                    <select
+                        id="timeFilter"
+                        wire:model.live="timeFilter"
+                        class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                    >
+                        <option value="all">Toute la période</option>
+                        <option value="today">Aujourd'hui</option>
+                        <option value="week">Cette semaine</option>
+                        <option value="month">Ce mois</option>
+                    </select>
+                </div>
+
+                <!-- Bascule erreurs résolues -->
+                <div class="flex items-center">
+                    <label class="flex items-center">
+                        <input
+                            type="checkbox"
+                            wire:model.live="showResolved"
+                            class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                        >
+                        <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Afficher résolues</span>
+                    </label>
+                </div>
             </div>
-            <p class="text-red-700 dark:text-red-300 text-sm mt-1">Les données peuvent ne pas être à jour. Vérifiez la connectivité du serveur.</p>
         </div>
 
-
-
-
-
-        <!-- Logs en temps réel -->
+        <!-- Tableau des erreurs -->
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
             <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
                 <div class="flex items-center justify-between">
-                    <div class="flex items-center space-x-3">
-                        <h3 class="text-lg font-medium text-gray-900 dark:text-white">
-                            Logs en temps réel
-                        </h3>
-                        @if(!$logsPaused)
-                            <div class="flex items-center space-x-2">
-                                <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                                <span class="text-sm text-green-600 dark:text-green-400">Surveillance active</span>
-                            </div>
-                        @else
-                            <div class="flex items-center space-x-2">
-                                <div class="w-2 h-2 bg-red-500 rounded-full"></div>
-                                <span class="text-sm text-red-600 dark:text-red-400">Surveillance en pause</span>
-                            </div>
-                        @endif
-                    </div>
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+                        Erreurs Lua détectées
+                    </h3>
                     <div class="flex items-center space-x-2">
                         <button
-                            wire:click="togglePause"
-                            class="px-3 py-1 text-sm rounded-md transition-colors {{ $logsPaused ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300' : 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300' }}"
-                        >
-                            {{ $logsPaused ? 'Reprendre' : 'Pause' }}
-                        </button>
-                        <button
                             wire:click="refreshLogs"
-                            class="px-3 py-1 text-sm rounded-md transition-colors bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
+                            class="px-3 py-1 text-sm rounded-md transition-colors bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800"
                         >
                             Actualiser
                         </button>
-                        <button
-                            wire:click="toggleShowResolved"
-                            class="px-3 py-1 text-sm rounded-md transition-colors {{ $showResolved ? 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300' : 'bg-gray-100 dark:bg-gray-900/20 text-gray-700 dark:text-gray-300' }}"
-                        >
-                            {{ $showResolved ? 'Masquer résolues' : 'Afficher résolues' }}
-                        </button>
                     </div>
                 </div>
             </div>
 
-            <!-- Tableau des logs -->
-            <div class="p-4" wire:poll.30s="monitorConsole">
+            <!-- Tableau des erreurs -->
+            <div class="p-4">
                 <div class="overflow-x-auto">
-
+                    @php
+                        // S'assurer que $logs est toujours un tableau
+                        if (!isset($logs) || !is_array($logs)) {
+                            $logs = [];
+                        }
+                    @endphp
                     
-                    
-            
-            <!-- Protection contre les erreurs de type -->
-            @php
-                // S'assurer que $logs est toujours un tableau
-                if (!isset($logs) || !is_array($logs)) {
-                    $logs = [];
-                }
-            @endphp
-            
-            <!-- Surveillance automatique de la console -->
-            <div @if(!$logsPaused) wire:poll.{{ $pollingInterval }}s="monitorConsole" @endif class="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center">
-                        <svg class="w-2 h-2 text-blue-600 dark:text-blue-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                        </svg>
-                        <div>
-                            <h3 class="text-sm font-medium text-blue-800 dark:text-blue-200">Surveillance de la console</h3>
-                            <p class="text-xs text-blue-600 dark:text-blue-400">
-                                <span class="inline-flex items-center">
-                                    @if($logsPaused)
-                                        <span class="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
-                                        Surveillance en pause - Capture automatique des erreurs Lua [ERROR] 
-                                    @else
-                                        <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse mr-2"></span>
-                                        Surveillance active - Capture automatique des erreurs Lua [ERROR] 
-                                    @endif
-                                    @if(isset($logs) && is_array($logs))
-                                        ({{ count($logs) }} erreur(s) ouverte(s))
-                                    @else
-                                        (Erreurs en cours de chargement...)
-                                    @endif
-                                </span>
-                            </p>
-                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                @if($logsPaused)
-                                    Surveillance en pause | Cliquez sur "Reprendre" pour relancer
-                                @else
-                                    @if($lastConsoleCheck)
-                                        Dernière vérification : {{ \Carbon\Carbon::parse($lastConsoleCheck)->format('H:i:s') }} | 
-                                    @endif
-                                    Polling toutes les {{ $pollingInterval }} secondes
-                                    @if($isMonitoring)
-                                        <span class="text-blue-600 dark:text-blue-400">• Surveillance en cours...</span>
-                                    @endif
-                                @endif
-                            </p>
-                        </div>
-                    </div>
-                    <button
-                        wire:click="monitorConsole"
-                        wire:loading.attr="disabled"
-                        wire:loading.class="opacity-50 cursor-not-allowed"
-                        class="inline-flex items-center px-3 py-1 rounded text-xs font-medium bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Surveiller la console maintenant"
-                    >
-                        <svg wire:loading.remove class="w-2 h-2 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                        </svg>
-                        <svg wire:loading class="w-2 h-2 mr-1 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                        </svg>
-                        Surveiller
-                    </button>
-                    
-                    <!-- Contrôles d'intervalle -->
-                    <div class="flex items-center space-x-1 ml-2">
-                        <span class="text-xs text-gray-600 dark:text-gray-400">Intervalle:</span>
-                        <button
-                            wire:click="setPollingInterval(1)"
-                            class="px-2 py-1 text-xs rounded {{ $pollingInterval === 1 ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300' : 'bg-gray-100 dark:bg-gray-900/20 text-gray-700 dark:text-gray-300' }}"
-                            title="1 seconde"
-                        >1s</button>
-                        <button
-                            wire:click="setPollingInterval(5)"
-                            class="px-2 py-1 text-xs rounded {{ $pollingInterval === 5 ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300' : 'bg-gray-100 dark:bg-gray-900/20 text-gray-700 dark:text-gray-300' }}"
-                            title="5 secondes"
-                        >5s</button>
-                        <button
-                            wire:click="setPollingInterval(10)"
-                            class="px-2 py-1 text-xs rounded {{ $pollingInterval === 10 ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300' : 'bg-gray-100 dark:bg-gray-900/20 text-gray-700 dark:text-gray-300' }}"
-                            title="10 secondes"
-                        >10s</button>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Tableau toujours visible -->
-            <table class="w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <table class="w-full divide-y divide-gray-200 dark:divide-gray-700">
                         <!-- En-tête du tableau -->
                         <thead class="bg-gray-50 dark:bg-gray-800">
                             <tr>
@@ -163,8 +103,14 @@
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-32">
                                     Dernière fois
                                 </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-24">
+                                    Niveau
+                                </th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                     Message d'erreur
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-32">
+                                    Addon
                                 </th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-48">
                                     Actions
@@ -181,6 +127,7 @@
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white w-32">
                                             <div class="flex flex-col">
                                                 <span class="font-medium">{{ \Carbon\Carbon::parse($log['first_seen'] ?? $log['timestamp'])->format('H:i:s') }}</span>
+                                                <span class="text-xs text-gray-500">{{ \Carbon\Carbon::parse($log['first_seen'] ?? $log['timestamp'])->format('d/m/Y') }}</span>
                                                 @if(isset($log['count']) && $log['count'] > 1)
                                                     <span class="text-xs text-orange-600 dark:text-orange-400 font-medium">{{ $log['count'] }}x</span>
                                                 @endif
@@ -191,10 +138,26 @@
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white w-32">
                                             <div class="flex flex-col">
                                                 <span class="font-medium">{{ \Carbon\Carbon::parse($log['last_seen'] ?? $log['timestamp'])->format('H:i:s') }}</span>
+                                                <span class="text-xs text-gray-500">{{ \Carbon\Carbon::parse($log['last_seen'] ?? $log['timestamp'])->format('d/m/Y') }}</span>
                                                 @if($log['resolved'] ?? false)
                                                     <span class="text-xs text-green-600 dark:text-green-400 font-medium">✓ Résolu</span>
                                                 @endif
                                             </div>
+                                        </td>
+
+                                        <!-- Niveau -->
+                                        <td class="px-6 py-4 whitespace-nowrap w-24">
+                                            @php
+                                                $levelColors = [
+                                                    'ERROR' => 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300',
+                                                    'WARNING' => 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300',
+                                                    'INFO' => 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300'
+                                                ];
+                                                $levelColor = $levelColors[$log['level'] ?? 'ERROR'] ?? $levelColors['ERROR'];
+                                            @endphp
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $levelColor }}">
+                                                {{ $log['level'] ?? 'ERROR' }}
+                                            </span>
                                         </td>
                                         
                                         <!-- Message d'erreur -->
@@ -212,6 +175,17 @@
                                                     </details>
                                                 @endif
                                             </div>
+                                        </td>
+
+                                        <!-- Addon -->
+                                        <td class="px-6 py-4 whitespace-nowrap w-32">
+                                            @if(isset($log['addon']) && !empty($log['addon']))
+                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300">
+                                                    {{ Str::limit($log['addon'], 20) }}
+                                                </span>
+                                            @else
+                                                <span class="text-xs text-gray-400">-</span>
+                                            @endif
                                         </td>
                                         
                                         <!-- Actions -->
@@ -266,9 +240,9 @@
                                     </tr>
                                 @endforeach
                             @else
-                                <!-- Ligne vide quand pas d'erreurs ou logs non définis -->
+                                <!-- Ligne vide quand pas d'erreurs -->
                                 <tr>
-                                    <td colspan="4" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                                    <td colspan="6" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                                         <div class="flex flex-col items-center">
                                             @if(!isset($logs))
                                                 <!-- Logs non encore chargés -->
@@ -277,16 +251,20 @@
                                                 </svg>
                                                 <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">Chargement des erreurs...</h3>
                                                 <p class="text-sm text-gray-500 dark:text-gray-400">
-                                                    Surveillance de la console en cours...
+                                                    Récupération des erreurs depuis la base de données...
                                                 </p>
                                             @else
                                                 <!-- Aucune erreur trouvée -->
                                                 <svg class="w-8 h-8 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                                 </svg>
-                                                <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">Aucune erreur ouverte trouvée</h3>
+                                                <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">Aucune erreur trouvée</h3>
                                                 <p class="text-sm text-gray-500 dark:text-gray-400">
-                                                    Toutes les erreurs sont fermées ou résolues.
+                                                    @if($showResolved)
+                                                        Aucune erreur ne correspond aux critères de recherche.
+                                                    @else
+                                                        Aucune erreur ouverte trouvée. Toutes les erreurs sont résolues.
+                                                    @endif
                                                 </p>
                                             @endif
                                         </div>
@@ -349,15 +327,6 @@
             // Forcer le refresh de Livewire
             if (window.Livewire) {
                 window.Livewire.dispatch('refresh');
-            }
-        });
-
-        // Écouter les erreurs de base de données
-        document.addEventListener('database-error', function(event) {
-            console.log('Database error:', event.detail);
-            const errorMessage = document.getElementById('database-error-message');
-            if (errorMessage) {
-                errorMessage.classList.remove('hidden');
             }
         });
     </script>

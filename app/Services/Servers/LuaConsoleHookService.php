@@ -667,35 +667,50 @@ class LuaConsoleHookService
      */
     private function isLuaError(string $line): bool
     {
-        $errorPatterns = [
-            '/\[ERROR\]/i',
-            '/lua error/i',
-            '/attempt to call/i',
-            '/attempt to index/i',
-            '/bad argument/i',
-            '/stack overflow/i',
-            '/memory error/i',
-            '/syntax error/i',
-            '/runtime error/i',
-            '/failed to load/i',
-            '/could not load/i',
-            '/error loading/i',
-            '/addon.*not found/i',
-            '/script.*failed/i',
-            '/function.*error/i',
-            '/nil value/i',
-            '/invalid.*argument/i',
-            '/out of memory/i',
-            '/segmentation fault/i',
-            '/access violation/i'
+        // Patterns d'erreurs Lua STRICTES uniquement
+        // Évite les messages d'information qui contiennent "error" dans un autre contexte
+        $strictPatterns = [
+            // Erreurs Lua explicites avec timestamp
+            '/^\[.*?\]\s*\[ERROR\]/i',           // [timestamp] [ERROR]
+            '/^\[.*?\]\s*Lua Error:/i',          // [timestamp] Lua Error:
+            '/^\[.*?\]\s*Script Error:/i',       // [timestamp] Script Error:
+            '/^\[.*?\]\s*Runtime Error:/i',      // [timestamp] Runtime Error:
+            '/^\[.*?\]\s*Syntax Error:/i',       // [timestamp] Syntax Error:
+            '/^\[.*?\]\s*Compile Error:/i',      // [timestamp] Compile Error:
+            
+            // Erreurs avec contexte spécifique
+            '/^\[.*?\]\s*Failed to load.*?addon/i',  // Failed to load addon
+            '/^\[.*?\]\s*Failed to execute.*?script/i', // Failed to execute script
+            '/^\[.*?\]\s*Cannot open.*?file/i',   // Cannot open file
+            '/^\[.*?\]\s*Permission denied/i',    // Permission denied
+            '/^\[.*?\]\s*File not found/i',       // File not found
+            
+            // Erreurs de programmation Lua
+            '/^\[.*?\]\s*Attempt to call nil value/i',  // Attempt to call nil value
+            '/^\[.*?\]\s*Bad argument #\d+ to/i',      // Bad argument #X to function
+            '/^\[.*?\]\s*Index out of bounds/i',        // Index out of bounds
+            '/^\[.*?\]\s*Division by zero/i',           // Division by zero
+            '/^\[.*?\]\s*Stack overflow/i',             // Stack overflow
+            '/^\[.*?\]\s*Memory allocation failed/i',   // Memory allocation failed
+            
+            // Erreurs système critiques
+            '/^\[.*?\]\s*System error/i',         // System error
+            '/^\[.*?\]\s*Critical error/i',       // Critical error
+            '/^\[.*?\]\s*Fatal error/i',          // Fatal error
         ];
-
-        foreach ($errorPatterns as $pattern) {
+        
+        // Vérifier d'abord si c'est une ligne de log valide avec timestamp
+        if (!preg_match('/^\[.*?\]\s*.*$/', $line)) {
+            return false; // Pas une ligne de log valide
+        }
+        
+        // Vérifier les patterns stricts
+        foreach ($strictPatterns as $pattern) {
             if (preg_match($pattern, $line)) {
                 return true;
             }
         }
-
+        
         return false;
     }
 
@@ -1257,64 +1272,43 @@ class LuaConsoleHookService
             $lineCounters[$serverId] = 10;
         }
 
-        // Lignes spécifiques à Garry's Mod pour chaque serveur avec timestamps et stack traces
+        // Lignes spécifiques à Garry's Mod pour chaque serveur - SEULEMENT des messages normaux
+        // Aucune erreur simulée pour éviter les faux positifs
         $gmodLines1 = [
             "[2024-01-15 14:30:25] Garry's Mod server starting up...",
             "[2024-01-15 14:30:26] Loading Lua scripts and addons...",
-            "[2024-01-15 14:30:26] [ERROR] Lua script failed to load: addon 'wiremod' not found",
-            "    at addon_loader.lua:45",
-            "    at workshop_manager.lua:123",
-            "    at server_init.lua:67",
-            "[2024-01-15 14:30:27] Addon 'sandbox' loaded successfully",
+            "[2024-01-15 14:30:26] Addon 'sandbox' loaded successfully",
+            "[2024-01-15 14:30:27] Workshop content downloaded",
             "[2024-01-15 14:30:28] Gamemode 'sandbox' initialized",
             "[2024-01-15 14:30:29] Server ready for connections",
-            "[2024-01-15 14:30:30] [ERROR] Attempt to call nil value in function 'player_initial_spawn'",
-            "    at player_manager.lua:89",
-            "    at spawn_system.lua:156",
-            "    at gamemode.lua:34",
-            "[2024-01-15 14:30:31] Player connected: TestPlayer",
-            "[2024-01-15 14:30:32] [ERROR] Bad argument #1 to 'print' (string expected, got nil)",
-            "    at debug.lua:23",
-            "    at player_utils.lua:67",
-            "[2024-01-15 14:30:33] Map loaded: gm_construct"
+            "[2024-01-15 14:30:30] Player connected: TestPlayer",
+            "[2024-01-15 14:30:31] Map loaded: gm_construct",
+            "[2024-01-15 14:30:32] Physics engine running",
+            "[2024-01-15 14:30:33] Server performance: Excellent"
         ];
 
         $gmodLines2 = [
             "[2024-01-15 14:30:25] GMod server initializing...",
             "[2024-01-15 14:30:26] Loading workshop content...",
             "[2024-01-15 14:30:27] Server configuration loaded",
-            "[2024-01-15 14:30:27] [ERROR] Failed to load workshop addon '123456789'",
-            "    at workshop_loader.lua:78",
-            "    at content_manager.lua:145",
-            "    at startup.lua:56",
             "[2024-01-15 14:30:28] Workshop addon loaded successfully",
             "[2024-01-15 14:30:29] Lua environment initialized",
-            "[2024-01-15 14:30:30] [ERROR] Memory allocation failed for texture loading",
-            "    at texture_manager.lua:92",
-            "    at resource_loader.lua:178",
-            "    at graphics.lua:45",
-            "[2024-01-15 14:30:31] Server ready for players",
-            "[2024-01-15 14:30:32] Player joined: Builder",
-            "[2024-01-15 14:30:33] Gamemode started"
+            "[2024-01-15 14:30:30] Server ready for players",
+            "[2024-01-15 14:30:31] Player joined: Builder",
+            "[2024-01-15 14:30:32] Gamemode started",
+            "[2024-01-15 14:30:33] Server running smoothly"
         ];
 
         $gmodLines3 = [
             "[2024-01-15 14:30:25] GarrysMod server starting...",
             "[2024-01-15 14:30:26] Loading custom Lua scripts...",
             "[2024-01-15 14:30:27] Server settings applied",
-            "[2024-01-15 14:30:27] [ERROR] Lua script 'custom_script.lua' syntax error",
-            "    at lua_parser.lua:34",
-            "    at script_loader.lua:89",
-            "    at custom_loader.lua:123",
             "[2024-01-15 14:30:28] Script loaded successfully",
             "[2024-01-15 14:30:29] Physics engine initialized",
-            "[2024-01-15 14:30:30] [ERROR] Failed to load custom model",
-            "    at model_loader.lua:67",
-            "    at asset_manager.lua:134",
-            "    at resource_system.lua:78",
-            "[2024-01-15 14:30:31] Server ready",
-            "[2024-01-15 14:30:32] Player connected: Developer",
-            "[2024-01-15 14:30:33] Custom gamemode loaded"
+            "[2024-01-15 14:30:30] Server ready",
+            "[2024-01-15 14:30:31] Player connected: Developer",
+            "[2024-01-15 14:30:32] Custom gamemode loaded",
+            "[2024-01-15 14:30:33] All systems operational"
         ];
 
         // Choisir les lignes selon l'ID du serveur

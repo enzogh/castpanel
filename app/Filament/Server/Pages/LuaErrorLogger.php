@@ -3,8 +3,7 @@
 namespace App\Filament\Server\Pages;
 
 use App\Models\Server;
-use App\Services\Servers\LuaLogService;
-use App\Services\Servers\LuaConsoleMonitorService;
+use App\Models\LuaError;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Pages\Page;
@@ -18,32 +17,16 @@ class LuaErrorLogger extends Page
 
     protected static string $view = 'filament.server.pages.lua-error-logger';
 
-    public bool $logsPaused = false;
     public bool $showResolved = false;
     public string $search = '';
     public string $levelFilter = 'all';
     public string $timeFilter = 'all';
-    public int $pollingInterval = 5; // 5 secondes au lieu de 30
-    public bool $isMonitoring = false;
-    public ?string $lastConsoleCheck = null;
-
-    protected ?LuaLogService $luaLogService = null;
 
     public function mount(): void
     {
         Log::info('Livewire: LuaErrorLogger page mounted', [
             'server_id' => $this->getServer()->id
         ]);
-        
-        // Démarrer la surveillance automatique de la console de manière sécurisée
-        try {
-            $this->startConsoleMonitoring();
-        } catch (\Exception $e) {
-            Log::error('Livewire: Failed to start console monitoring during mount', [
-                'server_id' => $this->getServer()->id,
-                'error' => $e->getMessage()
-            ]);
-        }
     }
 
     public function getTitle(): string
@@ -53,7 +36,7 @@ class LuaErrorLogger extends Page
 
     public function getSubheading(): string
     {
-        return 'Surveillez et analysez les erreurs Lua de votre serveur Garry\'s Mod';
+        return 'Consultez les erreurs Lua détectées sur votre serveur Garry\'s Mod';
     }
 
     public static function canAccess(): bool
@@ -94,13 +77,40 @@ class LuaErrorLogger extends Page
     public function getLogs(): array
     {
         try {
-            $service = app(LuaLogService::class);
-            $logs = $service->getLogs($this->getServer(), [
-                'search' => $this->search,
-                'level' => $this->levelFilter,
-                'time' => $this->timeFilter,
-                'show_resolved' => $this->showResolved
-            ]);
+            $query = LuaError::where('server_id', $this->getServer()->id);
+
+            // Filtre de recherche
+            if (!empty($this->search)) {
+                $query->where(function($q) {
+                    $q->where('message', 'like', '%' . $this->search . '%')
+                      ->orWhere('addon', 'like', '%' . $this->search . '%');
+                });
+            }
+
+            // Filtre de niveau
+            if ($this->levelFilter !== 'all') {
+                $query->where('level', $this->levelFilter);
+            }
+
+            // Filtre de temps
+            if ($this->timeFilter !== 'all') {
+                $timeRanges = [
+                    'today' => now()->startOfDay(),
+                    'week' => now()->subWeek(),
+                    'month' => now()->subMonth(),
+                ];
+                
+                if (isset($timeRanges[$this->timeFilter])) {
+                    $query->where('first_seen', '>=', $timeRanges[$this->timeFilter]);
+                }
+            }
+
+            // Filtre des erreurs résolues
+            if (!$this->showResolved) {
+                $query->where('resolved', false);
+            }
+
+            $logs = $query->orderBy('first_seen', 'desc')->get()->toArray();
 
             Log::info('Livewire: Logs retrieved successfully', [
                 'server_id' => $this->getServer()->id,
@@ -128,15 +138,20 @@ class LuaErrorLogger extends Page
     public function markAsResolved(string $errorKey): void
     {
         try {
-            $service = app(LuaLogService::class);
-            $service->markAsResolved($errorKey, $this->getServer()->id);
-            
-            Log::info('Livewire: Error marked as resolved', [
-                'server_id' => $this->getServer()->id,
-                'error_key' => $errorKey
-            ]);
+            $error = LuaError::where('error_key', $errorKey)
+                ->where('server_id', $this->getServer()->id)
+                ->first();
 
-            $this->dispatch('$refresh');
+            if ($error) {
+                $error->markAsResolved();
+                
+                Log::info('Livewire: Error marked as resolved', [
+                    'server_id' => $this->getServer()->id,
+                    'error_key' => $errorKey
+                ]);
+
+                $this->dispatch('$refresh');
+            }
 
         } catch (\Exception $e) {
             Log::error('Livewire: Failed to mark error as resolved', [
@@ -150,15 +165,20 @@ class LuaErrorLogger extends Page
     public function deleteError(string $errorKey): void
     {
         try {
-            $service = app(LuaLogService::class);
-            $service->deleteLog($errorKey, $this->getServer()->id);
-            
-            Log::info('Livewire: Error deleted', [
-                'server_id' => $this->getServer()->id,
-                'error_key' => $errorKey
-            ]);
+            $error = LuaError::where('error_key', $errorKey)
+                ->where('server_id', $this->getServer()->id)
+                ->first();
 
-            $this->dispatch('$refresh');
+            if ($error) {
+                $error->delete();
+                
+                Log::info('Livewire: Error deleted', [
+                    'server_id' => $this->getServer()->id,
+                    'error_key' => $errorKey
+                ]);
+
+                $this->dispatch('$refresh');
+            }
 
         } catch (\Exception $e) {
             Log::error('Livewire: Failed to delete error', [
@@ -177,8 +197,7 @@ class LuaErrorLogger extends Page
     public function clearLogs(): void
     {
         try {
-            $service = app(LuaLogService::class);
-            $service->clearLogs($this->getServer());
+            LuaError::where('server_id', $this->getServer()->id)->delete();
             
             Log::info('Livewire: Logs cleared', [
                 'server_id' => $this->getServer()->id
@@ -197,9 +216,40 @@ class LuaErrorLogger extends Page
     public function exportLogs(string $format): void
     {
         try {
-            $service = app(LuaLogService::class);
-            $service->exportLogs($this->getServer(), $format);
+            $logs = $this->getLogs();
             
+            if (empty($logs)) {
+                return;
+            }
+
+            $content = '';
+            $filename = 'lua-errors-' . $this->getServer()->id . '-' . now()->format('Y-m-d') . '.' . $format;
+            $contentType = '';
+
+            switch ($format) {
+                case 'json':
+                    $content = json_encode($logs, JSON_PRETTY_PRINT);
+                    $contentType = 'application/json';
+                    break;
+                    
+                case 'csv':
+                    $content = $this->toCsv($logs);
+                    $contentType = 'text/csv';
+                    break;
+                    
+                case 'txt':
+                    $content = $this->toText($logs);
+                    $contentType = 'text/plain';
+                    break;
+            }
+
+            // Déclencher le téléchargement via JavaScript
+            $this->dispatch('download-file', [
+                'content' => $content,
+                'filename' => $filename,
+                'contentType' => $contentType
+            ]);
+
             Log::info('Livewire: Logs exported', [
                 'server_id' => $this->getServer()->id,
                 'format' => $format
@@ -215,67 +265,6 @@ class LuaErrorLogger extends Page
     }
 
     /**
-     * Démarre la surveillance automatique de la console
-     */
-    public function startConsoleMonitoring(): void
-    {
-        if ($this->logsPaused) {
-            Log::info('Livewire: Console monitoring skipped - logs paused', [
-                'server_id' => $this->getServer()->id
-            ]);
-            return;
-        }
-
-        try {
-            $this->isMonitoring = true;
-            $this->lastConsoleCheck = now()->toISOString();
-            
-            $monitorService = app(LuaConsoleMonitorService::class);
-            $newErrors = $monitorService->monitorConsole($this->getServer());
-            
-            if (is_array($newErrors) && count($newErrors) > 0) {
-                Log::info('Livewire: Console monitoring completed, new errors found', [
-                    'server_id' => $this->getServer()->id,
-                    'new_errors_count' => count($newErrors),
-                    'timestamp' => $this->lastConsoleCheck
-                ]);
-                
-                // Forcer le refresh de l'interface
-                $this->dispatch('$refresh');
-            } else {
-                Log::info('Livewire: Console monitoring completed, no new errors', [
-                    'server_id' => $this->getServer()->id,
-                    'new_errors_type' => gettype($newErrors),
-                    'new_errors_count' => is_array($newErrors) ? count($newErrors) : 'not array',
-                    'timestamp' => $this->lastConsoleCheck
-                ]);
-            }
-            
-        } catch (\Exception $e) {
-            Log::error('Livewire: Failed to start console monitoring', [
-                'server_id' => $this->getServer()->id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-        } finally {
-            $this->isMonitoring = false;
-        }
-    }
-
-    /**
-     * Méthode appelée pour la surveillance en temps réel
-     */
-    public function monitorConsole(): void
-    {
-        Log::info('Livewire: Polling triggered - monitoring console', [
-            'server_id' => $this->getServer()->id,
-            'timestamp' => now()->toISOString()
-        ]);
-        
-        $this->startConsoleMonitoring();
-    }
-
-    /**
      * Bascule l'affichage des erreurs résolues
      */
     public function toggleShowResolved(): void
@@ -287,7 +276,6 @@ class LuaErrorLogger extends Page
             'show_resolved' => $this->showResolved
         ]);
         
-        // Forcer le refresh de l'interface
         $this->dispatch('$refresh');
     }
 
@@ -297,15 +285,20 @@ class LuaErrorLogger extends Page
     public function markAsUnresolved(string $errorKey): void
     {
         try {
-            $service = app(LuaLogService::class);
-            $service->markAsUnresolved($errorKey, $this->getServer()->id);
-            
-            Log::info('Livewire: Error marked as unresolved', [
-                'server_id' => $this->getServer()->id,
-                'error_key' => $errorKey
-            ]);
+            $error = LuaError::where('error_key', $errorKey)
+                ->where('server_id', $this->getServer()->id)
+                ->first();
 
-            $this->dispatch('$refresh');
+            if ($error) {
+                $error->markAsUnresolved();
+                
+                Log::info('Livewire: Error marked as unresolved', [
+                    'server_id' => $this->getServer()->id,
+                    'error_key' => $errorKey
+                ]);
+
+                $this->dispatch('$refresh');
+            }
 
         } catch (\Exception $e) {
             Log::error('Livewire: Failed to mark error as unresolved', [
@@ -317,34 +310,49 @@ class LuaErrorLogger extends Page
     }
 
     /**
-     * Bascule la pause de la surveillance
+     * Convertit les logs en CSV
      */
-    public function togglePause(): void
+    private function toCsv(array $logs): string
     {
-        $this->logsPaused = !$this->logsPaused;
-        
-        Log::info('Livewire: Toggle pause', [
-            'server_id' => $this->getServer()->id,
-            'logs_paused' => $this->logsPaused
-        ]);
-        
-        // Forcer le refresh de l'interface
-        $this->dispatch('$refresh');
+        if (empty($logs)) {
+            return '';
+        }
+
+        $headers = array_keys($logs[0]);
+        $csv = implode(',', $headers) . "\n";
+
+        foreach ($logs as $log) {
+            $csv .= implode(',', array_map(function($value) {
+                return '"' . str_replace('"', '""', $value) . '"';
+            }, $log)) . "\n";
+        }
+
+        return $csv;
     }
 
     /**
-     * Ajuste l'intervalle de polling
+     * Convertit les logs en texte
      */
-    public function setPollingInterval(int $interval): void
+    private function toText(array $logs): string
     {
-        $this->pollingInterval = max(1, min(60, $interval)); // Entre 1 et 60 secondes
-        
-        Log::info('Livewire: Polling interval updated', [
-            'server_id' => $this->getServer()->id,
-            'new_interval' => $this->pollingInterval
-        ]);
-        
-        $this->dispatch('$refresh');
+        if (empty($logs)) {
+            return 'Aucun log trouvé.';
+        }
+
+        $text = "Logs d'erreurs Lua\n";
+        $text .= str_repeat('=', 50) . "\n\n";
+
+        foreach ($logs as $log) {
+            $text .= "Erreur #{$log['id']}\n";
+            $text .= "Message: {$log['message']}\n";
+            $text .= "Addon: {$log['addon']}\n";
+            $text .= "Première fois: {$log['first_seen']}\n";
+            $text .= "Dernière fois: {$log['last_seen']}\n";
+            $text .= "Compteur: {$log['count']}x\n";
+            $text .= str_repeat('-', 30) . "\n\n";
+        }
+
+        return $text;
     }
 
     protected function getHeaderActions(): array
