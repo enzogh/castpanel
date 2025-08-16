@@ -166,7 +166,7 @@ class LuaErrorLogger extends Page implements HasTable
 
         // Tableau avec toutes les actions
         return $table
-            ->query(LuaError::query()->where('server_id', $serverId))
+            ->query(LuaError::query()->where('server_id', $serverId)->where('resolved', false))
             ->columns([
                 TextColumn::make('id')
                     ->label('ID')
