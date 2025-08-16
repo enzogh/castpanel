@@ -164,7 +164,7 @@ class LuaErrorLogger extends Page implements HasTable
             ]);
         }
 
-        // Tableau ultra-simple pour diagnostic
+        // Tableau avec toutes les actions
         return $table
             ->query(LuaError::query()->where('server_id', $serverId))
             ->columns([
@@ -183,32 +183,45 @@ class LuaErrorLogger extends Page implements HasTable
             ])
             ->actions([
                 TableAction::make('view')
-                    ->label('Voir')
+                    ->label('Voir détails')
                     ->icon('tabler-eye')
-                    ->action(function ($record) {
-                        Log::info('View action clicked', [
-                            'record_exists' => $record ? 'yes' : 'no',
-                            'record_id' => $record ? $record->id : 'null',
-                            'record_resolved' => $record ? $record->resolved : 'null',
-                            'record_data' => $record ? $record->toArray() : 'null'
-                        ]);
-                    }),
+                    ->color('info')
+                    ->modalContent(fn ($record) => view('filament.server.modals.lua-error-details', ['error' => $record]))
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Fermer'),
 
                 TableAction::make('resolve')
                     ->label('Résoudre')
                     ->icon('tabler-check')
                     ->color('success')
+                    ->visible(fn ($record) => !$record->resolved)
                     ->action(function ($record) {
-                        Log::info('Resolve action clicked', [
-                            'record_exists' => $record ? 'yes' : 'no',
-                            'record_id' => $record ? $record->id : 'null',
-                            'record_resolved' => $record ? $record->resolved : 'null'
-                        ]);
-                        
                         if ($record && $record->error_key) {
                             $this->markAsResolved($record->error_key);
+                            // Rafraîchir le tableau pour faire disparaître le bouton
+                            $this->dispatch('$refresh');
                         }
-                    }),
+                    })
+                    ->requiresConfirmation()
+                    ->modalHeading('Marquer comme résolu')
+                    ->modalDescription('Êtes-vous sûr de vouloir marquer cette erreur comme résolue ?')
+                    ->modalSubmitActionLabel('Résoudre'),
+
+                TableAction::make('delete')
+                    ->label('Supprimer')
+                    ->icon('tabler-trash')
+                    ->color('danger')
+                    ->action(function ($record) {
+                        if ($record && $record->error_key) {
+                            $this->deleteError($record->error_key);
+                            // Rafraîchir le tableau pour faire disparaître la ligne
+                            $this->dispatch('$refresh');
+                        }
+                    })
+                    ->requiresConfirmation()
+                    ->modalHeading('Supprimer l\'erreur')
+                    ->modalDescription('Êtes-vous sûr de vouloir supprimer cette erreur ? Cette action est irréversible.')
+                    ->modalSubmitActionLabel('Supprimer'),
             ])
             ->defaultSort('id', 'desc')
             ->paginated([10])
