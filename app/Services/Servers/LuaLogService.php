@@ -27,9 +27,15 @@ class LuaLogService
         }
 
         try {
-            // Récupérer seulement les erreurs ouvertes
+            // Récupérer les erreurs ouvertes et non résolues
             $query = LuaError::forServer($server->id)
-                ->where('status', 'open')
+                ->where(function($q) {
+                    $q->where('status', 'open')
+                      ->orWhere(function($subQ) {
+                          $subQ->where('status', '!=', 'closed')
+                               ->where('resolved', false);
+                      });
+                })
                 ->whereNull('closed_at');
 
             // Appliquer les filtres

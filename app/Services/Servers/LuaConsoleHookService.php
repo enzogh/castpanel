@@ -299,7 +299,7 @@ class LuaConsoleHookService
     /**
      * Charge la liste des serveurs à surveiller
      */
-    private function loadServers(): void
+    public function loadServers(): void
     {
         try {
             if ($this->debugMode) {
@@ -378,6 +378,14 @@ class LuaConsoleHookService
             ]);
             throw $e;
         }
+    }
+
+    /**
+     * Retourne la liste des serveurs surveillés
+     */
+    public function getMonitoredServers(): array
+    {
+        return $this->monitoredServers;
     }
 
     /**
