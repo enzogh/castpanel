@@ -12,6 +12,8 @@ class Dashboard extends BaseDashboard
     protected static ?string $navigationIcon = 'tabler-layout-dashboard';
 
     protected static ?string $title = 'Tableau de bord';
+    
+    protected static string $routePath = '/dashboard';
 
     public function getColumns(): int | string | array
     {
