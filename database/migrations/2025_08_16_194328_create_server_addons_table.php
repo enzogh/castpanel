@@ -11,7 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('server_addons', function (Blueprint $table) {
+        if (!Schema::hasTable('server_addons')) {
+            Schema::create('server_addons', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('server_id');
             $table->foreignId('addon_id')->constrained()->onDelete('cascade');
@@ -31,6 +32,7 @@ return new class extends Migration
             $table->index(['server_id', 'status']);
             $table->index('addon_id');
         });
+        }
     }
 
     /**

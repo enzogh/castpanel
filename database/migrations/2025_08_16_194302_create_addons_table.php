@@ -11,7 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('addons', function (Blueprint $table) {
+        if (!Schema::hasTable('addons')) {
+            Schema::create('addons', function (Blueprint $table) {
             $table->id();
             $table->string('name');
             $table->string('slug')->unique();
@@ -40,6 +41,7 @@ return new class extends Migration
             $table->index('downloads_count');
             $table->index('rating');
         });
+        }
     }
 
     /**
