@@ -120,7 +120,10 @@ class InstalledAddonResource extends Resource
                         return $record->addon && $record->version !== $record->addon->version;
                     })
                     ->action(function (ServerAddon $record) {
-                        $server = request()->route('tenant');
+                        $serverId = request()->route('tenant');
+                        if (!$serverId) return;
+                        
+                        $server = \App\Models\Server::find($serverId);
                         if (!$server) return;
                         
                         $addonService = app(AddonManagementService::class);
@@ -150,7 +153,10 @@ class InstalledAddonResource extends Resource
                     ->modalHeading('Désinstaller l\'addon')
                     ->modalDescription(fn (ServerAddon $record) => "Êtes-vous sûr de vouloir désinstaller {$record->name} ?")
                     ->action(function (ServerAddon $record) {
-                        $server = request()->route('tenant');
+                        $serverId = request()->route('tenant');
+                        if (!$serverId) return;
+                        
+                        $server = \App\Models\Server::find($serverId);
                         if (!$server) return;
                         
                         $addonService = app(AddonManagementService::class);
@@ -183,13 +189,13 @@ class InstalledAddonResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        $server = request()->route('tenant');
-        if (!$server) {
+        $serverId = request()->route('tenant');
+        if (!$serverId) {
             return parent::getEloquentQuery()->whereRaw('1 = 0'); // Return empty result
         }
         
         return parent::getEloquentQuery()
-            ->where('server_id', $server->id)
+            ->where('server_id', $serverId)
             ->with('addon');
     }
 

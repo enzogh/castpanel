@@ -85,10 +85,10 @@ class AddonResource extends Resource
                 Tables\Columns\TextColumn::make('installation_status')
                     ->label('Statut')
                     ->getStateUsing(function (Addon $record) {
-                        $server = request()->route('tenant');
-                        if (!$server) return 'not_installed';
+                        $serverId = request()->route('tenant');
+                        if (!$serverId) return 'not_installed';
                         
-                        $serverAddon = ServerAddon::where('server_id', $server->id)
+                        $serverAddon = ServerAddon::where('server_id', $serverId)
                             ->where('addon_id', $record->id)
                             ->first();
                         
@@ -137,10 +137,10 @@ class AddonResource extends Resource
                     ->icon('heroicon-o-arrow-down-tray')
                     ->color('success')
                     ->visible(function (Addon $record) {
-                        $server = request()->route('tenant');
-                        if (!$server) return false;
+                        $serverId = request()->route('tenant');
+                        if (!$serverId) return false;
                         
-                        return !ServerAddon::where('server_id', $server->id)
+                        return !ServerAddon::where('server_id', $serverId)
                             ->where('addon_id', $record->id)
                             ->exists();
                     })
@@ -148,7 +148,10 @@ class AddonResource extends Resource
                     ->modalHeading('Installer l\'addon')
                     ->modalDescription(fn (Addon $record) => "Êtes-vous sûr de vouloir installer {$record->name} ?")
                     ->action(function (Addon $record) {
-                        $server = request()->route('tenant');
+                        $serverId = request()->route('tenant');
+                        if (!$serverId) return;
+                        
+                        $server = \App\Models\Server::find($serverId);
                         if (!$server) return;
                         
                         $addonService = app(AddonManagementService::class);
@@ -175,10 +178,10 @@ class AddonResource extends Resource
                     ->icon('heroicon-o-trash')
                     ->color('danger')
                     ->visible(function (Addon $record) {
-                        $server = request()->route('tenant');
-                        if (!$server) return false;
+                        $serverId = request()->route('tenant');
+                        if (!$serverId) return false;
                         
-                        return ServerAddon::where('server_id', $server->id)
+                        return ServerAddon::where('server_id', $serverId)
                             ->where('addon_id', $record->id)
                             ->exists();
                     })
@@ -186,7 +189,10 @@ class AddonResource extends Resource
                     ->modalHeading('Désinstaller l\'addon')
                     ->modalDescription(fn (Addon $record) => "Êtes-vous sûr de vouloir désinstaller {$record->name} ?")
                     ->action(function (Addon $record) {
-                        $server = request()->route('tenant');
+                        $serverId = request()->route('tenant');
+                        if (!$serverId) return;
+                        
+                        $server = \App\Models\Server::find($serverId);
                         if (!$server) return;
                         
                         $addonService = app(AddonManagementService::class);
@@ -213,17 +219,20 @@ class AddonResource extends Resource
                     ->icon('heroicon-o-arrow-path')
                     ->color('warning')
                     ->visible(function (Addon $record) {
-                        $server = request()->route('tenant');
-                        if (!$server) return false;
+                        $serverId = request()->route('tenant');
+                        if (!$serverId) return false;
                         
-                        $serverAddon = ServerAddon::where('server_id', $server->id)
+                        $serverAddon = ServerAddon::where('server_id', $serverId)
                             ->where('addon_id', $record->id)
                             ->first();
                         
                         return $serverAddon && $serverAddon->version !== $record->version;
                     })
                     ->action(function (Addon $record) {
-                        $server = request()->route('tenant');
+                        $serverId = request()->route('tenant');
+                        if (!$serverId) return;
+                        
+                        $server = \App\Models\Server::find($serverId);
                         if (!$server) return;
                         
                         $addonService = app(AddonManagementService::class);
