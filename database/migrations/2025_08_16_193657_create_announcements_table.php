@@ -11,7 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('announcements', function (Blueprint $table) {
+        if (!Schema::hasTable('announcements')) {
+            Schema::create('announcements', function (Blueprint $table) {
             $table->id();
             $table->string('title');
             $table->text('content');
@@ -28,6 +29,7 @@ return new class extends Migration
             $table->index(['start_at', 'end_at']);
             // Index et contrainte de clé étrangère seront ajoutés par la migration de correction
         });
+        }
     }
 
     /**
