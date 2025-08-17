@@ -4,6 +4,7 @@ namespace App\Filament\App\Resources\ServerResource\Pages;
 
 use App\Enums\ServerResourceType;
 use App\Filament\App\Resources\ServerResource;
+use App\Filament\App\Resources\ServerResource\Widgets\ServerStatsWidget;
 use App\Filament\Components\Tables\Columns\ServerEntryColumn;
 use App\Filament\Server\Pages\Console;
 use App\Models\Permission;
@@ -43,6 +44,13 @@ class ListServers extends ListRecords
     public function boot(): void
     {
         $this->daemonPowerRepository = new DaemonPowerRepository();
+    }
+
+    protected function getHeaderWidgets(): array
+    {
+        return [
+            ServerStatsWidget::class,
+        ];
     }
 
     /** @return Stack[] */
@@ -113,9 +121,9 @@ class ListServers extends ListRecords
             ->actions(!$usingGrid ? ActionGroup::make(static::getPowerActions(view: 'table')) : [])
             ->actionsAlignment(Alignment::Center->value)
             ->contentGrid($usingGrid ? ['default' => 1, 'md' => 2] : null)
-            ->emptyStateIcon('tabler-brand-docker')
-            ->emptyStateDescription('')
-            ->emptyStateHeading(fn () => $this->activeTab === 'my' ? 'You don\'t own any servers!' : 'You don\'t have access to any servers!')
+            ->emptyStateIcon('tabler-server-off')
+            ->emptyStateDescription('Aucun serveur disponible dans cette catégorie. Contactez votre administrateur pour créer ou accéder à des serveurs.')
+            ->emptyStateHeading(fn () => $this->activeTab === 'my' ? 'Vous ne possédez aucun serveur' : 'Vous n\'avez accès à aucun serveur')
             ->persistFiltersInSession()
             ->filters([
                 SelectFilter::make('egg')
@@ -142,15 +150,18 @@ class ListServers extends ListRecords
         $other = (clone $all)->whereNot('owner_id', auth()->user()->id);
 
         return [
-            'my' => Tab::make('My Servers')
+            'my' => Tab::make('Mes serveurs')
+                ->icon('tabler-user')
                 ->badge(fn () => $my->count())
                 ->modifyQueryUsing(fn () => $my),
 
-            'other' => Tab::make('Others\' Servers')
+            'other' => Tab::make('Serveurs partagés')
+                ->icon('tabler-users')
                 ->badge(fn () => $other->count())
                 ->modifyQueryUsing(fn () => $other),
 
-            'all' => Tab::make('All Servers')
+            'all' => Tab::make('Tous les serveurs')
+                ->icon('tabler-server')
                 ->badge($all->count()),
         ];
     }
