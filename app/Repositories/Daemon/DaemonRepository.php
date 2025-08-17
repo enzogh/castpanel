@@ -12,16 +12,16 @@ use Illuminate\Http\Client\Response;
 
 abstract class DaemonRepository
 {
-    protected ?Server $server;
+    protected $server;
 
-    protected ?Node $node;
+    protected $node;
 
     /**
      * Set the server model this request is stemming from.
      *
      * @return static
      */
-    public function setServer(Server $server): self
+    public function setServer($server): self
     {
         $this->server = $server;
 
@@ -33,7 +33,7 @@ abstract class DaemonRepository
     /**
      * Set the node model this request is stemming from.
      */
-    public function setNode(Node $node): static
+    public function setNode($node): static
     {
         $this->node = $node;
 

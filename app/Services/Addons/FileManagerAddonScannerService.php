@@ -36,7 +36,7 @@ class FileManagerAddonScannerService
     /**
      * Scanne les addons Garry's Mod en utilisant FileManager
      */
-    public function scanAddons(Server $server): array
+    public function scanAddons($server): array
     {
         if (!$this->isGmodServer($server)) {
             Log::warning("Tentative de scan d'addons sur un serveur non-Garry's Mod: {$server->name}");
@@ -235,7 +235,7 @@ class FileManagerAddonScannerService
     /**
      * Liste le contenu d'un répertoire via FileManager
      */
-    protected function listDirectoryContents(Server $server, string $path): array
+    protected function listDirectoryContents($server, string $path): array
     {
         try {
             // Utiliser le service FileManager pour lister le contenu
@@ -262,7 +262,7 @@ class FileManagerAddonScannerService
     /**
      * Analyse un fichier/dossier pour détecter s'il s'agit d'un addon
      */
-    protected function analyzeAddonFile(Server $server, array $fileInfo, string $basePath): ?array
+    protected function analyzeAddonFile($server, array $fileInfo, string $basePath): ?array
     {
         try {
             $fileName = $fileInfo['name'] ?? '';
@@ -343,7 +343,7 @@ class FileManagerAddonScannerService
     /**
      * Lit le fichier addon.json d'un addon
      */
-    protected function readAddonJson(Server $server, string $addonPath): ?array
+    protected function readAddonJson($server, string $addonPath): ?array
     {
         try {
             $fileManager = app(\App\Services\Files\FileManagerService::class);
@@ -378,7 +378,7 @@ class FileManagerAddonScannerService
     /**
      * Lit et analyse un fichier Lua principal
      */
-    protected function readLuaFile(Server $server, string $addonPath): ?array
+    protected function readLuaFile($server, string $addonPath): ?array
     {
         try {
             $fileManager = app(\App\Services\Files\FileManagerService::class);

@@ -39,7 +39,7 @@ class DaemonFileRepository extends DaemonRepository
             throw new FileNotFoundException();
         }
 
-        return $response;
+        return $response->body();
     }
 
     /**

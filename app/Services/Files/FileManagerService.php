@@ -18,7 +18,7 @@ class FileManagerService
     /**
      * Liste le contenu d'un répertoire sur le serveur
      */
-    public function listDirectory(Server $server, string $path): array
+    public function listDirectory($server, string $path): array
     {
         try {
             Log::info("Listage du répertoire {$path} sur le serveur {$server->name}");
@@ -43,7 +43,7 @@ class FileManagerService
     /**
      * Lit le contenu d'un fichier sur le serveur
      */
-    public function readFile(Server $server, string $filePath): ?string
+    public function readFile($server, string $filePath): ?string
     {
         try {
             Log::info("Lecture du fichier {$filePath} sur le serveur {$server->name}");
@@ -68,7 +68,7 @@ class FileManagerService
     /**
      * Vérifie si un fichier existe sur le serveur
      */
-    public function fileExists(Server $server, string $filePath): bool
+    public function fileExists($server, string $filePath): bool
     {
         try {
             Log::debug("Vérification de l'existence du fichier {$filePath} sur le serveur {$server->name}");
@@ -98,7 +98,7 @@ class FileManagerService
     /**
      * Vérifie si un répertoire existe sur le serveur
      */
-    public function directoryExists(Server $server, string $directoryPath): bool
+    public function directoryExists($server, string $directoryPath): bool
     {
         try {
             Log::debug("Vérification de l'existence du répertoire {$directoryPath} sur le serveur {$server->name}");
@@ -121,7 +121,7 @@ class FileManagerService
     /**
      * Récupère les informations d'un fichier sur le serveur
      */
-    public function getFileInfo(Server $server, string $filePath): ?array
+    public function getFileInfo($server, string $filePath): ?array
     {
         try {
             Log::debug("Récupération des informations du fichier {$filePath} sur le serveur {$server->name}");
@@ -150,7 +150,7 @@ class FileManagerService
     /**
      * Récupère la taille d'un fichier sur le serveur
      */
-    public function getFileSize(Server $server, string $filePath): ?int
+    public function getFileSize($server, string $filePath): ?int
     {
         try {
             $fileInfo = $this->getFileInfo($server, $filePath);
@@ -170,7 +170,7 @@ class FileManagerService
     /**
      * Récupère la date de modification d'un fichier sur le serveur
      */
-    public function getFileModifiedDate(Server $server, string $filePath): ?string
+    public function getFileModifiedDate($server, string $filePath): ?string
     {
         try {
             $fileInfo = $this->getFileInfo($server, $filePath);
@@ -190,7 +190,7 @@ class FileManagerService
     /**
      * Recherche des fichiers sur le serveur selon un pattern
      */
-    public function searchFiles(Server $server, string $searchPattern, string $startPath = '/'): array
+    public function searchFiles($server, string $searchPattern, string $startPath = '/'): array
     {
         try {
             Log::info("Recherche de fichiers avec le pattern '{$searchPattern}' dans {$startPath} sur le serveur {$server->name}");
@@ -210,7 +210,7 @@ class FileManagerService
     /**
      * Recherche récursive de fichiers
      */
-    protected function searchFilesRecursive(Server $server, string $currentPath, string $searchPattern, array &$results, int $maxDepth = 10, int $currentDepth = 0): void
+    protected function searchFilesRecursive($server, string $currentPath, string $searchPattern, array &$results, int $maxDepth = 10, int $currentDepth = 0): void
     {
         if ($currentDepth >= $maxDepth) {
             return;
