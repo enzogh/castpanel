@@ -94,11 +94,8 @@ class WebFtpAddonScannerService
         try {
             Log::info("Listage du répertoire {$path} via WebFTP sur le serveur {$server->name}");
             
-            // Construire l'URL de l'API des fichiers
-            $apiUrl = route('api.client.servers.files.list', [
-                'server' => $server->uuid,
-                'directory' => $path
-            ]);
+            // Construire l'URL de l'API des fichiers (pas de nom de route, on utilise l'URL directe)
+            $apiUrl = url("/api/client/servers/{$server->uuid}/files/list") . '?directory=' . urlencode($path);
             
             Log::info("URL de l'API WebFTP: {$apiUrl}");
             
@@ -132,11 +129,8 @@ class WebFtpAddonScannerService
         try {
             Log::info("Lecture du fichier {$filePath} via WebFTP sur le serveur {$server->name}");
             
-            // Construire l'URL de l'API des fichiers
-            $apiUrl = route('api.client.servers.files.contents', [
-                'server' => $server->uuid,
-                'file' => $filePath
-            ]);
+            // Construire l'URL de l'API des fichiers (pas de nom de route, on utilise l'URL directe)
+            $apiUrl = url("/api/client/servers/{$server->uuid}/files/contents") . '?file=' . urlencode($filePath);
             
             // Faire la requête HTTP à l'API des fichiers
             $response = Http::withHeaders([
