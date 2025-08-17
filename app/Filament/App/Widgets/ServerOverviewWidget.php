@@ -13,8 +13,8 @@ class ServerOverviewWidget extends BaseWidget
         $user = auth()->user();
         $allServers = $user->accessibleServers();
         $myServers = $allServers->where('owner_id', $user->id);
-        $onlineServers = $allServers->whereHas('status', function ($query) {
-            $query->where('status', 'running');
+        $onlineServers = $allServers->filter(function ($server) {
+            return $server->retrieveStatus()->isRunning();
         });
 
         return [
