@@ -11,7 +11,7 @@ class FileManagerAddonScannerService
     /**
      * Vérifie si le serveur est un serveur Garry's Mod
      */
-    public function isGmodServer(Server $server): bool
+    public function isGmodServer($server): bool
     {
         Log::info("Vérification du type de serveur pour {$server->name}", [
             'server_id' => $server->id,
@@ -90,6 +90,146 @@ class FileManagerAddonScannerService
             Log::error("Erreur lors du scan des addons pour {$server->name}: " . $e->getMessage());
             throw $e;
         }
+    }
+
+    /**
+     * Test du scan d'addons sans accès à la base de données
+     * Utilise des données mockées pour tester la logique
+     */
+    public function testScanAddonsWithoutDatabase(): array
+    {
+        Log::info("Test du scan d'addons sans base de données");
+        
+        // Créer un serveur mock
+        $mockServer = new \stdClass();
+        $mockServer->id = 1;
+        $mockServer->name = 'Serveur Test GMod';
+        $mockServer->egg_id = 1;
+        
+        // Créer un egg mock
+        $mockEgg = new \stdClass();
+        $mockEgg->id = 1;
+        $mockEgg->name = 'Garry\'s Mod';
+        
+        $mockServer->egg = $mockEgg;
+        
+        // Vérifier si c'est un serveur Garry's Mod
+        if (!$this->isGmodServer($mockServer)) {
+            Log::warning("Le serveur mock n'est pas reconnu comme Garry's Mod");
+            return [];
+        }
+        
+        Log::info("Début du test de scan d'addons pour le serveur {$mockServer->name}");
+        
+        try {
+            // Chemins typiques des addons Garry's Mod
+            $addonPaths = [
+                'garrysmod/addons',
+                'addons',
+                'garrysmod/lua/autorun',
+                'lua/autorun'
+            ];
+            
+            $detectedAddons = [];
+            
+            foreach ($addonPaths as $path) {
+                Log::info("Test du chemin: {$path}");
+                
+                try {
+                    // Simuler la détection d'addons pour ce chemin
+                    $mockAddons = $this->getMockAddonsForPath($path);
+                    
+                    if (!empty($mockAddons)) {
+                        Log::info("Addons mock trouvés dans {$path}: " . count($mockAddons));
+                        
+                        foreach ($mockAddons as $addon) {
+                            $detectedAddons[] = $addon;
+                            Log::info("Addon mock détecté: {$addon['name']} dans {$path}");
+                        }
+                    } else {
+                        Log::info("Aucun addon mock trouvé dans {$path}");
+                    }
+                    
+                } catch (\Exception $e) {
+                    Log::warning("Erreur lors du test du chemin {$path}: " . $e->getMessage());
+                    continue;
+                }
+            }
+            
+            Log::info("Test de scan terminé. Addons détectés: " . count($detectedAddons));
+            return $detectedAddons;
+            
+        } catch (\Exception $e) {
+            Log::error("Erreur lors du test de scan des addons: " . $e->getMessage());
+            throw $e;
+        }
+    }
+    
+    /**
+     * Génère des addons mock pour tester la logique
+     */
+    protected function getMockAddonsForPath(string $path): array
+    {
+        $mockAddons = [];
+        
+        switch ($path) {
+            case 'garrysmod/addons':
+                $mockAddons = [
+                    [
+                        'name' => 'Wiremod',
+                        'description' => 'Système de câblage avancé pour Garry\'s Mod',
+                        'version' => '1.0.0',
+                        'author' => 'Wire Team',
+                        'file_path' => 'garrysmod/addons/wiremod',
+                        'type' => 'addon',
+                        'metadata' => []
+                    ],
+                    [
+                        'name' => 'DarkRP',
+                        'description' => 'Mode de jeu Roleplay',
+                        'version' => '2.0.0',
+                        'author' => 'DarkRP Team',
+                        'file_path' => 'garrysmod/addons/darkrp',
+                        'type' => 'addon',
+                        'metadata' => []
+                    ]
+                ];
+                break;
+                
+            case 'addons':
+                $mockAddons = [
+                    [
+                        'name' => 'Test Addon',
+                        'description' => 'Addon de test',
+                        'version' => '1.0.0',
+                        'author' => 'Test Author',
+                        'file_path' => 'addons/test_addon',
+                        'type' => 'basic_addon',
+                        'metadata' => []
+                    ]
+                ];
+                break;
+                
+            case 'garrysmod/lua/autorun':
+                $mockAddons = [
+                    [
+                        'name' => 'Lua Script',
+                        'description' => 'Script Lua automatique',
+                        'version' => '1.0.0',
+                        'author' => 'Lua Author',
+                        'file_path' => 'garrysmod/lua/autorun/lua_script',
+                        'type' => 'lua_addon',
+                        'metadata' => []
+                    ]
+                ];
+                break;
+                
+            default:
+                $mockAddons = [];
+                break;
+        }
+        
+        return $mockAddons;
     }
 
     /**
