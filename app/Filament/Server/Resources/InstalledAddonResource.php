@@ -4,7 +4,7 @@ namespace App\Filament\Server\Resources;
 
 use App\Filament\Server\Resources\InstalledAddonResource\Pages;
 use App\Models\ServerAddon;
-use App\Services\Addons\GmodAddonScannerService;
+use App\Services\Addons\FileManagerAddonScannerService;
 use App\Services\Servers\AddonManagementService;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -105,7 +105,7 @@ class InstalledAddonResource extends Resource
                             // S'assurer que l'egg est chargé
                             $server->load('egg');
                             
-                            $scanner = app(GmodAddonScannerService::class);
+                            $scanner = app(FileManagerAddonScannerService::class);
                             return $scanner->isGmodServer($server);
                         } catch (\Exception $e) {
                             return false;
@@ -123,13 +123,13 @@ class InstalledAddonResource extends Resource
                             // S'assurer que l'egg est chargé
                             $server->load('egg');
                             
-                            $scanner = app(GmodAddonScannerService::class);
+                            $scanner = app(FileManagerAddonScannerService::class);
                             
-                            // Scanner les addons installés
-                            $detectedAddons = $scanner->scanInstalledAddons($server);
+                            // Scanner les addons installés via FileManager
+                            $detectedAddons = $scanner->scanAddons($server);
                             
                             // Synchroniser avec la base de données
-                            $syncResults = $scanner->syncDetectedAddons($server, $detectedAddons);
+                            $syncResults = $scanner->syncAddons($server, $detectedAddons);
                             
                             $message = sprintf(
                                 'Scan terminé : %d addons ajoutés, %d mis à jour, %d supprimés.',
