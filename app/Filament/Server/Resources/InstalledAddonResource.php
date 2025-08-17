@@ -120,7 +120,9 @@ class InstalledAddonResource extends Resource
                         return $record->addon && $record->version !== $record->addon->version;
                     })
                     ->action(function (ServerAddon $record) {
-                        $server = filament()->getTenant();
+                        $server = request()->route('tenant');
+                        if (!$server) return;
+                        
                         $addonService = app(AddonManagementService::class);
                         
                         try {
@@ -148,7 +150,9 @@ class InstalledAddonResource extends Resource
                     ->modalHeading('Désinstaller l\'addon')
                     ->modalDescription(fn (ServerAddon $record) => "Êtes-vous sûr de vouloir désinstaller {$record->name} ?")
                     ->action(function (ServerAddon $record) {
-                        $server = filament()->getTenant();
+                        $server = request()->route('tenant');
+                        if (!$server) return;
+                        
                         $addonService = app(AddonManagementService::class);
                         
                         try {
@@ -179,7 +183,10 @@ class InstalledAddonResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        $server = filament()->getTenant();
+        $server = request()->route('tenant');
+        if (!$server) {
+            return parent::getEloquentQuery()->whereRaw('1 = 0'); // Return empty result
+        }
         
         return parent::getEloquentQuery()
             ->where('server_id', $server->id)

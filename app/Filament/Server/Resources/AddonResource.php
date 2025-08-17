@@ -28,6 +28,8 @@ class AddonResource extends Resource
     protected static ?int $navigationSort = 4;
 
     protected static ?string $tenantOwnershipRelationshipName = null;
+    
+    protected static bool $isScopedToTenant = false;
 
     public static function table(Table $table): Table
     {
@@ -83,7 +85,9 @@ class AddonResource extends Resource
                 Tables\Columns\TextColumn::make('installation_status')
                     ->label('Statut')
                     ->getStateUsing(function (Addon $record) {
-                        $server = filament()->getTenant();
+                        $server = request()->route('tenant');
+                        if (!$server) return 'not_installed';
+                        
                         $serverAddon = ServerAddon::where('server_id', $server->id)
                             ->where('addon_id', $record->id)
                             ->first();
@@ -133,7 +137,9 @@ class AddonResource extends Resource
                     ->icon('heroicon-o-arrow-down-tray')
                     ->color('success')
                     ->visible(function (Addon $record) {
-                        $server = filament()->getTenant();
+                        $server = request()->route('tenant');
+                        if (!$server) return false;
+                        
                         return !ServerAddon::where('server_id', $server->id)
                             ->where('addon_id', $record->id)
                             ->exists();
@@ -142,7 +148,9 @@ class AddonResource extends Resource
                     ->modalHeading('Installer l\'addon')
                     ->modalDescription(fn (Addon $record) => "Êtes-vous sûr de vouloir installer {$record->name} ?")
                     ->action(function (Addon $record) {
-                        $server = filament()->getTenant();
+                        $server = request()->route('tenant');
+                        if (!$server) return;
+                        
                         $addonService = app(AddonManagementService::class);
                         
                         try {
@@ -167,7 +175,9 @@ class AddonResource extends Resource
                     ->icon('heroicon-o-trash')
                     ->color('danger')
                     ->visible(function (Addon $record) {
-                        $server = filament()->getTenant();
+                        $server = request()->route('tenant');
+                        if (!$server) return false;
+                        
                         return ServerAddon::where('server_id', $server->id)
                             ->where('addon_id', $record->id)
                             ->exists();
@@ -176,7 +186,9 @@ class AddonResource extends Resource
                     ->modalHeading('Désinstaller l\'addon')
                     ->modalDescription(fn (Addon $record) => "Êtes-vous sûr de vouloir désinstaller {$record->name} ?")
                     ->action(function (Addon $record) {
-                        $server = filament()->getTenant();
+                        $server = request()->route('tenant');
+                        if (!$server) return;
+                        
                         $addonService = app(AddonManagementService::class);
                         
                         try {
@@ -201,7 +213,9 @@ class AddonResource extends Resource
                     ->icon('heroicon-o-arrow-path')
                     ->color('warning')
                     ->visible(function (Addon $record) {
-                        $server = filament()->getTenant();
+                        $server = request()->route('tenant');
+                        if (!$server) return false;
+                        
                         $serverAddon = ServerAddon::where('server_id', $server->id)
                             ->where('addon_id', $record->id)
                             ->first();
@@ -209,7 +223,9 @@ class AddonResource extends Resource
                         return $serverAddon && $serverAddon->version !== $record->version;
                     })
                     ->action(function (Addon $record) {
-                        $server = filament()->getTenant();
+                        $server = request()->route('tenant');
+                        if (!$server) return;
+                        
                         $addonService = app(AddonManagementService::class);
                         
                         try {
