@@ -86,14 +86,18 @@ class AddonResource extends Resource
                 Tables\Columns\TextColumn::make('installation_status')
                     ->label('Statut')
                     ->getStateUsing(function (Addon $record) {
-                        $serverId = request()->route('tenant');
-                        if (!$serverId) return 'not_installed';
-                        
-                        $serverAddon = ServerAddon::where('server_id', $serverId)
-                            ->where('addon_id', $record->id)
-                            ->first();
-                        
-                        return $serverAddon ? $serverAddon->status : 'not_installed';
+                        try {
+                            $server = filament()->getTenant();
+                            if (!$server) return 'not_installed';
+                            
+                            $serverAddon = ServerAddon::where('server_id', $server->id)
+                                ->where('addon_id', $record->id)
+                                ->first();
+                            
+                            return $serverAddon ? $serverAddon->status : 'not_installed';
+                        } catch (\Exception $e) {
+                            return 'not_installed';
+                        }
                     })
                     ->formatStateUsing(function ($state) {
                         return match ($state) {
@@ -126,10 +130,16 @@ class AddonResource extends Resource
                 Tables\Filters\Filter::make('installed')
                     ->label('Installés')
                     ->query(function (Builder $query) {
-                        $server = filament()->getTenant();
-                        return $query->whereHas('serverAddons', function ($q) use ($server) {
-                            $q->where('server_id', $server->id);
-                        });
+                        try {
+                            $server = filament()->getTenant();
+                            if (!$server) return $query;
+                            
+                            return $query->whereHas('serverAddons', function ($q) use ($server) {
+                                $q->where('server_id', $server->id);
+                            });
+                        } catch (\Exception $e) {
+                            return $query;
+                        }
                     }),
             ])
             ->actions([
@@ -138,33 +148,42 @@ class AddonResource extends Resource
                     ->icon('heroicon-o-arrow-down-tray')
                     ->color('success')
                     ->visible(function (Addon $record) {
-                        $serverId = request()->route('tenant');
-                        if (!$serverId) return false;
-                        
-                        return !ServerAddon::where('server_id', $serverId)
-                            ->where('addon_id', $record->id)
-                            ->exists();
+                        try {
+                            $server = filament()->getTenant();
+                            if (!$server) return false;
+                            
+                            return !ServerAddon::where('server_id', $server->id)
+                                ->where('addon_id', $record->id)
+                                ->exists();
+                        } catch (\Exception $e) {
+                            return false;
+                        }
                     })
                     ->requiresConfirmation()
                     ->modalHeading('Installer l\'addon')
                     ->modalDescription(fn (Addon $record) => "Êtes-vous sûr de vouloir installer {$record->name} ?")
                     ->action(function (Addon $record) {
-                        $serverId = request()->route('tenant');
-                        if (!$serverId) return;
-                        
-                        $server = \App\Models\Server::find($serverId);
-                        if (!$server) return;
-                        
-                        $addonService = app(AddonManagementService::class);
-                        
                         try {
-                            $addonService->installAddon($server, $record);
-                            
-                            Notification::make()
-                                ->title('Addon installé')
-                                ->body("L'addon {$record->name} a été installé avec succès.")
-                                ->success()
-                                ->send();
+                            $server = filament()->getTenant();
+                            if (!$server) return;
+                        
+                            $addonService = app(AddonManagementService::class);
+                        
+                            try {
+                                $addonService->installAddon($server, $record);
+                                
+                                Notification::make()
+                                    ->title('Addon installé')
+                                    ->body("L'addon {$record->name} a été installé avec succès.")
+                                    ->success()
+                                    ->send();
+                            } catch (\Exception $e) {
+                                Notification::make()
+                                    ->title('Erreur d\'installation')
+                                    ->body("Impossible d'installer l'addon : {$e->getMessage()}")
+                                    ->danger()
+                                    ->send();
+                            }
                         } catch (\Exception $e) {
                             Notification::make()
                                 ->title('Erreur d\'installation')
@@ -179,33 +198,42 @@ class AddonResource extends Resource
                     ->icon('heroicon-o-trash')
                     ->color('danger')
                     ->visible(function (Addon $record) {
-                        $serverId = request()->route('tenant');
-                        if (!$serverId) return false;
-                        
-                        return ServerAddon::where('server_id', $serverId)
-                            ->where('addon_id', $record->id)
-                            ->exists();
+                        try {
+                            $server = filament()->getTenant();
+                            if (!$server) return false;
+                            
+                            return ServerAddon::where('server_id', $server->id)
+                                ->where('addon_id', $record->id)
+                                ->exists();
+                        } catch (\Exception $e) {
+                            return false;
+                        }
                     })
                     ->requiresConfirmation()
                     ->modalHeading('Désinstaller l\'addon')
                     ->modalDescription(fn (Addon $record) => "Êtes-vous sûr de vouloir désinstaller {$record->name} ?")
                     ->action(function (Addon $record) {
-                        $serverId = request()->route('tenant');
-                        if (!$serverId) return;
-                        
-                        $server = \App\Models\Server::find($serverId);
-                        if (!$server) return;
-                        
-                        $addonService = app(AddonManagementService::class);
-                        
                         try {
-                            $addonService->uninstallAddon($server, $record);
-                            
-                            Notification::make()
-                                ->title('Addon désinstallé')
-                                ->body("L'addon {$record->name} a été désinstallé avec succès.")
-                                ->success()
-                                ->send();
+                            $server = filament()->getTenant();
+                            if (!$server) return;
+                        
+                            $addonService = app(AddonManagementService::class);
+                        
+                            try {
+                                $addonService->uninstallAddon($server, $record);
+                                
+                                Notification::make()
+                                    ->title('Addon désinstallé')
+                                    ->body("L'addon {$record->name} a été désinstallé avec succès.")
+                                    ->success()
+                                    ->send();
+                            } catch (\Exception $e) {
+                                Notification::make()
+                                    ->title('Erreur de désinstallation')
+                                    ->body("Impossible de désinstaller l'addon : {$e->getMessage()}")
+                                    ->danger()
+                                    ->send();
+                            }
                         } catch (\Exception $e) {
                             Notification::make()
                                 ->title('Erreur de désinstallation')
@@ -220,32 +248,41 @@ class AddonResource extends Resource
                     ->icon('heroicon-o-arrow-path')
                     ->color('warning')
                     ->visible(function (Addon $record) {
-                        $serverId = request()->route('tenant');
-                        if (!$serverId) return false;
-                        
-                        $serverAddon = ServerAddon::where('server_id', $serverId)
-                            ->where('addon_id', $record->id)
-                            ->first();
-                        
-                        return $serverAddon && $serverAddon->version !== $record->version;
+                        try {
+                            $server = filament()->getTenant();
+                            if (!$server) return false;
+                            
+                            $serverAddon = ServerAddon::where('server_id', $server->id)
+                                ->where('addon_id', $record->id)
+                                ->first();
+                            
+                            return $serverAddon && $serverAddon->version !== $record->version;
+                        } catch (\Exception $e) {
+                            return false;
+                        }
                     })
                     ->action(function (Addon $record) {
-                        $serverId = request()->route('tenant');
-                        if (!$serverId) return;
-                        
-                        $server = \App\Models\Server::find($serverId);
-                        if (!$server) return;
-                        
-                        $addonService = app(AddonManagementService::class);
-                        
                         try {
-                            $addonService->updateAddon($server, $record);
-                            
-                            Notification::make()
-                                ->title('Addon mis à jour')
-                                ->body("L'addon {$record->name} a été mis à jour avec succès.")
-                                ->success()
-                                ->send();
+                            $server = filament()->getTenant();
+                            if (!$server) return;
+                        
+                            $addonService = app(AddonManagementService::class);
+                        
+                            try {
+                                $addonService->updateAddon($server, $record);
+                                
+                                Notification::make()
+                                    ->title('Addon mis à jour')
+                                    ->body("L'addon {$record->name} a été mis à jour avec succès.")
+                                    ->success()
+                                    ->send();
+                            } catch (\Exception $e) {
+                                Notification::make()
+                                    ->title('Erreur de mise à jour')
+                                    ->body("Impossible de mettre à jour l'addon : {$e->getMessage()}")
+                                    ->danger()
+                                    ->send();
+                            }
                         } catch (\Exception $e) {
                             Notification::make()
                                 ->title('Erreur de mise à jour')

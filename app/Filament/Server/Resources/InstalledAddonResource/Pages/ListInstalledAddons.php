@@ -16,7 +16,16 @@ class ListInstalledAddons extends ListRecords
             Actions\Action::make('browse_addons')
                 ->label('Parcourir les addons')
                 ->icon('heroicon-o-magnifying-glass')
-                ->url(fn () => route('filament.server.resources.addons.index', ['tenant' => request()->route('tenant')]))
+                ->url(function () {
+                    try {
+                        $server = filament()->getTenant();
+                        if (!$server) return '#';
+                        
+                        return route('filament.server.resources.addons.index', ['tenant' => $server->id]);
+                    } catch (\Exception $e) {
+                        return '#';
+                    }
+                })
                 ->color('primary'),
         ];
     }
