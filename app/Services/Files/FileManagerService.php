@@ -49,7 +49,7 @@ class FileManagerService
             Log::info("Lecture du fichier {$filePath} sur le serveur {$server->name}");
             
             // Utiliser le repository Daemon pour lire le fichier
-            $content = $this->daemonFileRepository->getContent($server, $filePath);
+            $content = $this->daemonFileRepository->setServer($server)->getContent($filePath);
             
             if ($content !== null) {
                 Log::info("Fichier {$filePath} lu avec succès, taille: " . strlen($content) . " octets");
