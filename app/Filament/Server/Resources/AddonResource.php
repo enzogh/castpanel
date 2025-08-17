@@ -5,7 +5,7 @@ namespace App\Filament\Server\Resources;
 use App\Filament\Server\Resources\AddonResource\Pages;
 use App\Models\Addon;
 use App\Models\ServerAddon;
-use App\Services\Addons\GmodAddonScannerService;
+use App\Services\Addons\WebFtpAddonScannerService;
 use App\Services\Servers\AddonManagementService;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -313,7 +313,7 @@ class AddonResource extends Resource
                             // S'assurer que l'egg est chargé
                             $server->load('egg');
                             
-                            $scanner = app(GmodAddonScannerService::class);
+                            $scanner = app(WebFtpAddonScannerService::class);
                             return $scanner->isGmodServer($server);
                         } catch (\Exception $e) {
                             return false;
@@ -321,7 +321,7 @@ class AddonResource extends Resource
                     })
                     ->requiresConfirmation()
                     ->modalHeading('Scanner les addons installés')
-                    ->modalDescription('Cette action va scanner le répertoire garrysmod/addons pour détecter automatiquement les addons installés sur ce serveur.')
+                    ->modalDescription('Cette action va scanner les répertoires addons via WebFTP pour détecter automatiquement les addons installés sur ce serveur.')
                     ->modalSubmitActionLabel('Scanner')
                     ->action(function () {
                         try {
@@ -331,13 +331,13 @@ class AddonResource extends Resource
                             // S'assurer que l'egg est chargé
                             $server->load('egg');
                             
-                            $scanner = app(GmodAddonScannerService::class);
+                            $scanner = app(WebFtpAddonScannerService::class);
                             
-                            // Scanner les addons installés
-                            $detectedAddons = $scanner->scanInstalledAddons($server);
+                            // Scanner les addons installés via WebFTP
+                            $detectedAddons = $scanner->scanAddons($server);
                             
                             // Synchroniser avec la base de données
-                            $syncResults = $scanner->syncDetectedAddons($server, $detectedAddons);
+                            $syncResults = $scanner->syncAddons($server, $detectedAddons);
                             
                             $message = sprintf(
                                 'Scan terminé : %d addons ajoutés, %d mis à jour, %d supprimés.',

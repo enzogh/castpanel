@@ -40,6 +40,11 @@ class LuaListCommand extends Command
                 'usage' => 'php artisan lua:scan [--server=ID|test] [--path=chemin] [--debug]'
             ],
             [
+                'command' => 'lua:scan-webftp',
+                'description' => 'Scanner les addons via WebFTP/API des fichiers (--server=test pour mode test, --debug pour debug complet)',
+                'usage' => 'php artisan lua:scan-webftp [--server=ID|test] [--debug]'
+            ],
+            [
                 'command' => 'lua:list',
                 'description' => 'Lister toutes les commandes Lua disponibles',
                 'usage' => 'php artisan lua:list'
@@ -59,6 +64,11 @@ class LuaListCommand extends Command
         $this->line('   php artisan lua:scan --server=test  # Mode test sans base de données');
         $this->line('   php artisan lua:scan --debug         # Debug complet détaillé');
         $this->line('   php artisan lua:scan --path=garrysmod/addons');
+        $this->newLine();
+        $this->line('   # Nouvelles commandes WebFTP :');
+        $this->line('   php artisan lua:scan-webftp --server=1');
+        $this->line('   php artisan lua:scan-webftp --server=test  # Mode test WebFTP');
+        $this->line('   php artisan lua:scan-webftp --debug         # Debug complet WebFTP');
         
         return 0;
     }
