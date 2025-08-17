@@ -27,6 +27,8 @@ class AddonResource extends Resource
 
     protected static ?int $navigationSort = 4;
 
+    protected static ?string $tenantOwnershipRelationshipName = null;
+
     public static function table(Table $table): Table
     {
         return $table
@@ -242,11 +244,8 @@ class AddonResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        $server = filament()->getTenant();
-        
         return parent::getEloquentQuery()
-            ->where('is_active', true)
-            ->whereJsonContains('supported_games', $server->egg->name ?? 'gmod');
+            ->where('is_active', true);
     }
 
     public static function getPages(): array
