@@ -24,7 +24,7 @@ class FileManagerService
             Log::info("Listage du répertoire {$path} sur le serveur {$server->name}");
             
             // Utiliser le repository Daemon pour lister le contenu
-            $contents = $this->daemonFileRepository->getDirectory($server, $path);
+            $contents = $this->daemonFileRepository->setServer($server)->getDirectory($path);
             
             if (is_array($contents)) {
                 Log::info("Contenu récupéré pour {$path}: " . count($contents) . " éléments");
