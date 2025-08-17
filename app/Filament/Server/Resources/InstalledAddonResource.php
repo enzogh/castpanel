@@ -98,29 +98,27 @@ class InstalledAddonResource extends Resource
                     ->icon('heroicon-o-magnifying-glass')
                     ->color('info')
                     ->visible(function () {
-                        $serverId = request()->route('tenant');
-                        if (!$serverId) return false;
-                        
-                        $server = \App\Models\Server::find($serverId);
-                        if (!$server) return false;
-                        
-                        $scanner = app(GmodAddonScannerService::class);
-                        return $scanner->isGmodServer($server);
+                        try {
+                            $server = filament()->getTenant();
+                            if (!$server) return false;
+                            
+                            $scanner = app(GmodAddonScannerService::class);
+                            return $scanner->isGmodServer($server);
+                        } catch (\Exception $e) {
+                            return false;
+                        }
                     })
                     ->requiresConfirmation()
                     ->modalHeading('Scanner les addons installés')
                     ->modalDescription('Cette action va scanner le répertoire garrysmod/addons pour détecter automatiquement les addons installés sur ce serveur Garry\'s Mod.')
                     ->modalSubmitActionLabel('Scanner')
                     ->action(function () {
-                        $serverId = request()->route('tenant');
-                        if (!$serverId) return;
-                        
-                        $server = \App\Models\Server::find($serverId);
-                        if (!$server) return;
-                        
-                        $scanner = app(GmodAddonScannerService::class);
-                        
                         try {
+                            $server = filament()->getTenant();
+                            if (!$server) return;
+                            
+                            $scanner = app(GmodAddonScannerService::class);
+                            
                             // Scanner les addons installés
                             $detectedAddons = $scanner->scanInstalledAddons($server);
                             
@@ -261,14 +259,18 @@ class InstalledAddonResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        $serverId = request()->route('tenant');
-        if (!$serverId) {
-            return parent::getEloquentQuery()->whereRaw('1 = 0'); // Return empty result
+        try {
+            $server = filament()->getTenant();
+            if (!$server) {
+                return parent::getEloquentQuery()->whereRaw('1 = 0'); // Return empty result
+            }
+            
+            return parent::getEloquentQuery()
+                ->where('server_id', $server->id)
+                ->with('addon');
+        } catch (\Exception $e) {
+            return parent::getEloquentQuery()->whereRaw('1 = 0'); // Return empty result on error
         }
-        
-        return parent::getEloquentQuery()
-            ->where('server_id', $serverId)
-            ->with('addon');
     }
 
     public static function getPages(): array

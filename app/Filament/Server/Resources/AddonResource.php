@@ -269,19 +269,27 @@ class AddonResource extends Resource
                     ->icon('heroicon-o-magnifying-glass')
                     ->color('info')
                     ->visible(function () {
-                        $server = filament()->getTenant();
-                        $scanner = app(GmodAddonScannerService::class);
-                        return $server && $scanner->isGmodServer($server);
+                        try {
+                            $server = filament()->getTenant();
+                            if (!$server) return false;
+                            
+                            $scanner = app(GmodAddonScannerService::class);
+                            return $scanner->isGmodServer($server);
+                        } catch (\Exception $e) {
+                            return false;
+                        }
                     })
                     ->requiresConfirmation()
                     ->modalHeading('Scanner les addons installés')
                     ->modalDescription('Cette action va scanner le répertoire garrysmod/addons pour détecter automatiquement les addons installés sur ce serveur.')
                     ->modalSubmitActionLabel('Scanner')
                     ->action(function () {
-                        $server = filament()->getTenant();
-                        $scanner = app(GmodAddonScannerService::class);
-                        
                         try {
+                            $server = filament()->getTenant();
+                            if (!$server) return;
+                            
+                            $scanner = app(GmodAddonScannerService::class);
+                            
                             // Scanner les addons installés
                             $detectedAddons = $scanner->scanInstalledAddons($server);
                             
