@@ -16,7 +16,7 @@ return new class extends Migration
             $table->dropForeign(['server']);
 
             $table->renameColumn('server', 'server_id');
-            $table->unsignedInteger('user_id')->nullable()->after('id');
+            $table->unsignedBigInteger('user_id')->nullable()->after('id');
 
             $table->foreign('server_id')->references('id')->on('servers');
             $table->foreign('user_id')->references('id')->on('users');

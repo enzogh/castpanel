@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('uuid', 36);
             $table->boolean('is_system')->default(false);
-            $table->unsignedInteger('user_id')->nullable();
+            $table->unsignedBigInteger('user_id')->nullable();
             $table->unsignedInteger('server_id')->nullable();
             $table->string('action');
             $table->string('subaction')->nullable();

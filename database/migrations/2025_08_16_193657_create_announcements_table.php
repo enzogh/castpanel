@@ -18,7 +18,7 @@ return new class extends Migration
             $table->enum('type', ['info', 'warning', 'success', 'danger', 'maintenance'])->default('info');
             $table->boolean('is_active')->default(true);
             $table->boolean('is_pinned')->default(false);
-            $table->foreignId('author_id')->constrained('users')->onDelete('cascade');
+            $table->unsignedBigInteger('author_id');
             $table->string('target_users')->default('all');
             $table->timestamp('start_at')->nullable();
             $table->timestamp('end_at')->nullable();
@@ -26,7 +26,7 @@ return new class extends Migration
 
             $table->index(['is_active', 'is_pinned']);
             $table->index(['start_at', 'end_at']);
-            $table->index('author_id');
+            // Index et contrainte de clé étrangère seront ajoutés par la migration de correction
         });
     }
 

@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('daemon_keys', function (Blueprint $table) {
             $table->increments('id');
             $table->unsignedInteger('server_id');
-            $table->unsignedInteger('user_id');
+            $table->unsignedBigInteger('user_id');
             $table->string('secret')->unique();
             $table->timestamp('expires_at');
             $table->timestamps();

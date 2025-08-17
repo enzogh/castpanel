@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('recovery_tokens', function (Blueprint $table) {
             $table->id();
-            $table->unsignedInteger('user_id');
+            $table->unsignedBigInteger('user_id');
             $table->string('token');
             $table->timestamp('created_at')->nullable();
 

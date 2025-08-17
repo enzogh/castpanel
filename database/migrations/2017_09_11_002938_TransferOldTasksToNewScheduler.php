@@ -57,7 +57,7 @@ return new class extends Migration
     {
         Schema::create('tasks_old', function (Blueprint $table) {
             $table->increments('id');
-            $table->unsignedInteger('user_id')->nullable();
+            $table->unsignedBigInteger('user_id')->nullable();
             $table->unsignedInteger('server_id');
             $table->tinyInteger('active')->default(1);
             $table->string('action');

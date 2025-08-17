@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('user_ssh_keys', function (Blueprint $table) {
             $table->increments('id');
-            $table->unsignedInteger('user_id');
+            $table->unsignedBigInteger('user_id');
             $table->string('name');
             $table->string('fingerprint');
             $table->text('public_key');
