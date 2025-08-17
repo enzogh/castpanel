@@ -54,6 +54,15 @@ return new class extends Migration
                 });
             }
 
+            // Table server_addons
+            if (Schema::hasTable('server_addons')) {
+                Schema::table('server_addons', function (Blueprint $table) {
+                    if (Schema::hasColumn('server_addons', 'server_id')) {
+                        $table->unsignedBigInteger('server_id')->change();
+                    }
+                });
+            }
+
             // Table recovery_tokens
             if (Schema::hasTable('recovery_tokens')) {
                 Schema::table('recovery_tokens', function (Blueprint $table) {
@@ -129,6 +138,18 @@ return new class extends Migration
 
             // Table announcements - contrainte de clé étrangère ajoutée par une migration séparée
 
+            // Table server_addons
+            if (Schema::hasTable('server_addons')) {
+                Schema::table('server_addons', function (Blueprint $table) {
+                    if (Schema::hasColumn('server_addons', 'server_id') && !$this->foreignKeyExists('server_addons', 'server_addons_server_id_foreign')) {
+                        $table->foreign('server_id')->references('id')->on('servers')->onDelete('cascade');
+                    }
+                    if (Schema::hasColumn('server_addons', 'addon_id') && !$this->foreignKeyExists('server_addons', 'server_addons_addon_id_foreign')) {
+                        $table->foreign('addon_id')->references('id')->on('addons')->onDelete('cascade');
+                    }
+                });
+            }
+
         } catch (Exception $e) {
             // Log l'erreur mais ne pas faire échouer la migration
             \Log::error('Erreur lors de la correction des types de colonnes: ' . $e->getMessage());
@@ -157,6 +178,22 @@ return new class extends Migration
         }
 
         // Table announcements - gérée par une migration séparée
+
+        // Table server_addons
+        if (Schema::hasTable('server_addons')) {
+            Schema::table('server_addons', function (Blueprint $table) {
+                try {
+                    $table->dropForeign(['server_id']);
+                } catch (Exception $e) {
+                    // Ignorer l'erreur si la contrainte n'existe pas
+                }
+                try {
+                    $table->dropForeign(['addon_id']);
+                } catch (Exception $e) {
+                    // Ignorer l'erreur si la contrainte n'existe pas
+                }
+            });
+        }
     }
 
     /**

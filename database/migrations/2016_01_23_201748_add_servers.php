@@ -11,7 +11,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('servers', function (Blueprint $table) {
-            $table->increments('id');
+            $table->bigIncrements('id');
             $table->string('uuid', 36)->unique();
             $table->string('uuidShort', 8)->unique();
             $table->mediumInteger('node')->unsigned();

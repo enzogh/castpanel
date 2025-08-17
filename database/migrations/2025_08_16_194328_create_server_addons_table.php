@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('server_addons', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('server_id')->constrained()->onDelete('cascade');
+            $table->unsignedBigInteger('server_id');
             $table->foreignId('addon_id')->constrained()->onDelete('cascade');
             $table->string('name');
             $table->text('description')->nullable();
