@@ -4,6 +4,7 @@ namespace App\Filament\App\Pages;
 
 use App\Filament\App\Widgets\AnnouncementsWidget;
 use App\Filament\App\Widgets\QuickTicketWidget;
+use App\Filament\App\Widgets\RecentServersWidget;
 use App\Filament\App\Widgets\ServerOverviewWidget;
 use App\Filament\App\Resources\TicketResource\Widgets\TicketStatsWidget;
 use Filament\Pages\Dashboard as BaseDashboard;
@@ -18,13 +19,17 @@ class Dashboard extends BaseDashboard
 
     public function getColumns(): int | string | array
     {
-        return 2;
+        return [
+            'md' => 2,
+            'xl' => 3,
+        ];
     }
 
     public function getWidgets(): array
     {
         return [
             ServerOverviewWidget::class,
+            RecentServersWidget::class,
             AnnouncementsWidget::class,
             TicketStatsWidget::class,
             QuickTicketWidget::class,
