@@ -24,9 +24,24 @@ class GmodAddonScannerService
      */
     public function isGmodServer(Server $server): bool
     {
-        return $server->egg && 
-               (Str::contains(strtolower($server->egg->name), 'garry') || 
-                Str::contains(strtolower($server->egg->name), 'gmod'));
+        Log::info("Vérification du type de serveur pour {$server->name}", [
+            'server_id' => $server->id,
+            'has_egg' => $server->egg ? 'yes' : 'no',
+            'egg_name' => $server->egg ? $server->egg->name : 'null',
+            'egg_id' => $server->egg ? $server->egg->id : 'null'
+        ]);
+        
+        if (!$server->egg) {
+            Log::warning("Le serveur {$server->name} n'a pas d'egg associé");
+            return false;
+        }
+        
+        $isGmod = Str::contains(strtolower($server->egg->name), 'garry') || 
+                  Str::contains(strtolower($server->egg->name), 'gmod');
+        
+        Log::info("Résultat de la vérification pour {$server->name}: " . ($isGmod ? 'Garry\'s Mod' : 'Autre type'));
+        
+        return $isGmod;
     }
 
     /**

@@ -310,6 +310,9 @@ class AddonResource extends Resource
                             $server = filament()->getTenant();
                             if (!$server) return false;
                             
+                            // S'assurer que l'egg est chargé
+                            $server->load('egg');
+                            
                             $scanner = app(GmodAddonScannerService::class);
                             return $scanner->isGmodServer($server);
                         } catch (\Exception $e) {
@@ -324,6 +327,9 @@ class AddonResource extends Resource
                         try {
                             $server = filament()->getTenant();
                             if (!$server) return;
+                            
+                            // S'assurer que l'egg est chargé
+                            $server->load('egg');
                             
                             $scanner = app(GmodAddonScannerService::class);
                             
