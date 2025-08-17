@@ -1,0 +1,258 @@
+<?php
+
+namespace App\Filament\Server\Resources;
+
+use App\Filament\Server\Resources\AddonResource\Pages;
+use App\Models\Addon;
+use App\Models\ServerAddon;
+use App\Services\Servers\AddonManagementService;
+use Filament\Forms;
+use Filament\Forms\Form;
+use Filament\Resources\Resource;
+use Filament\Tables;
+use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Filament\Notifications\Notification;
+
+class AddonResource extends Resource
+{
+    protected static ?string $model = Addon::class;
+
+    protected static ?string $navigationIcon = 'heroicon-o-puzzle-piece';
+
+    protected static ?string $navigationLabel = 'Addons';
+
+    protected static ?string $navigationGroup = 'Gestion';
+
+    protected static ?int $navigationSort = 4;
+
+    public static function table(Table $table): Table
+    {
+        return $table
+            ->columns([
+                Tables\Columns\ImageColumn::make('image_url')
+                    ->label('Image')
+                    ->circular()
+                    ->defaultImageUrl('/images/addon-default.png'),
+                
+                Tables\Columns\TextColumn::make('name')
+                    ->label('Nom')
+                    ->searchable()
+                    ->weight('bold'),
+                
+                Tables\Columns\TextColumn::make('description')
+                    ->label('Description')
+                    ->limit(60)
+                    ->wrap(),
+                
+                Tables\Columns\TextColumn::make('author')
+                    ->label('Auteur')
+                    ->searchable(),
+                
+                Tables\Columns\TextColumn::make('version')
+                    ->label('Version'),
+                
+                Tables\Columns\BadgeColumn::make('category')
+                    ->label('Catégorie')
+                    ->formatStateUsing(fn ($state) => Addon::getCategories()[$state] ?? $state)
+                    ->colors([
+                        'primary' => Addon::CATEGORY_GAMEPLAY,
+                        'success' => Addon::CATEGORY_ADMINISTRATION,
+                        'warning' => Addon::CATEGORY_UI,
+                        'info' => Addon::CATEGORY_API,
+                        'gray' => Addon::CATEGORY_UTILITY,
+                        'purple' => Addon::CATEGORY_COSMETIC,
+                    ]),
+                
+                Tables\Columns\TextColumn::make('formatted_file_size')
+                    ->label('Taille'),
+                
+                Tables\Columns\TextColumn::make('downloads_count')
+                    ->label('Téléchargements')
+                    ->numeric()
+                    ->sortable(),
+                
+                Tables\Columns\TextColumn::make('rating')
+                    ->label('Note')
+                    ->numeric()
+                    ->sortable(),
+                
+                Tables\Columns\TextColumn::make('installation_status')
+                    ->label('Statut')
+                    ->getStateUsing(function (Addon $record) {
+                        $server = filament()->getTenant();
+                        $serverAddon = ServerAddon::where('server_id', $server->id)
+                            ->where('addon_id', $record->id)
+                            ->first();
+                        
+                        return $serverAddon ? $serverAddon->status : 'not_installed';
+                    })
+                    ->formatStateUsing(function ($state) {
+                        return match ($state) {
+                            'installed' => 'Installé',
+                            'updating' => 'Mise à jour',
+                            'failed' => 'Échec',
+                            'disabled' => 'Désactivé',
+                            default => 'Non installé',
+                        };
+                    })
+                    ->badge()
+                    ->color(function ($state) {
+                        return match ($state) {
+                            'installed' => 'success',
+                            'updating' => 'warning',
+                            'failed' => 'danger',
+                            'disabled' => 'gray',
+                            default => 'primary',
+                        };
+                    }),
+            ])
+            ->filters([
+                Tables\Filters\SelectFilter::make('category')
+                    ->label('Catégorie')
+                    ->options(Addon::getCategories()),
+                
+                Tables\Filters\TernaryFilter::make('is_featured')
+                    ->label('En vedette'),
+                
+                Tables\Filters\Filter::make('installed')
+                    ->label('Installés')
+                    ->query(function (Builder $query) {
+                        $server = filament()->getTenant();
+                        return $query->whereHas('serverAddons', function ($q) use ($server) {
+                            $q->where('server_id', $server->id);
+                        });
+                    }),
+            ])
+            ->actions([
+                Tables\Actions\Action::make('install')
+                    ->label('Installer')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->color('success')
+                    ->visible(function (Addon $record) {
+                        $server = filament()->getTenant();
+                        return !ServerAddon::where('server_id', $server->id)
+                            ->where('addon_id', $record->id)
+                            ->exists();
+                    })
+                    ->requiresConfirmation()
+                    ->modalHeading('Installer l\'addon')
+                    ->modalDescription(fn (Addon $record) => "Êtes-vous sûr de vouloir installer {$record->name} ?")
+                    ->action(function (Addon $record) {
+                        $server = filament()->getTenant();
+                        $addonService = app(AddonManagementService::class);
+                        
+                        try {
+                            $addonService->installAddon($server, $record);
+                            
+                            Notification::make()
+                                ->title('Addon installé')
+                                ->body("L'addon {$record->name} a été installé avec succès.")
+                                ->success()
+                                ->send();
+                        } catch (\Exception $e) {
+                            Notification::make()
+                                ->title('Erreur d\'installation')
+                                ->body("Impossible d'installer l'addon : {$e->getMessage()}")
+                                ->danger()
+                                ->send();
+                        }
+                    }),
+                
+                Tables\Actions\Action::make('uninstall')
+                    ->label('Désinstaller')
+                    ->icon('heroicon-o-trash')
+                    ->color('danger')
+                    ->visible(function (Addon $record) {
+                        $server = filament()->getTenant();
+                        return ServerAddon::where('server_id', $server->id)
+                            ->where('addon_id', $record->id)
+                            ->exists();
+                    })
+                    ->requiresConfirmation()
+                    ->modalHeading('Désinstaller l\'addon')
+                    ->modalDescription(fn (Addon $record) => "Êtes-vous sûr de vouloir désinstaller {$record->name} ?")
+                    ->action(function (Addon $record) {
+                        $server = filament()->getTenant();
+                        $addonService = app(AddonManagementService::class);
+                        
+                        try {
+                            $addonService->uninstallAddon($server, $record);
+                            
+                            Notification::make()
+                                ->title('Addon désinstallé')
+                                ->body("L'addon {$record->name} a été désinstallé avec succès.")
+                                ->success()
+                                ->send();
+                        } catch (\Exception $e) {
+                            Notification::make()
+                                ->title('Erreur de désinstallation')
+                                ->body("Impossible de désinstaller l'addon : {$e->getMessage()}")
+                                ->danger()
+                                ->send();
+                        }
+                    }),
+                
+                Tables\Actions\Action::make('update')
+                    ->label('Mettre à jour')
+                    ->icon('heroicon-o-arrow-path')
+                    ->color('warning')
+                    ->visible(function (Addon $record) {
+                        $server = filament()->getTenant();
+                        $serverAddon = ServerAddon::where('server_id', $server->id)
+                            ->where('addon_id', $record->id)
+                            ->first();
+                        
+                        return $serverAddon && $serverAddon->version !== $record->version;
+                    })
+                    ->action(function (Addon $record) {
+                        $server = filament()->getTenant();
+                        $addonService = app(AddonManagementService::class);
+                        
+                        try {
+                            $addonService->updateAddon($server, $record);
+                            
+                            Notification::make()
+                                ->title('Addon mis à jour')
+                                ->body("L'addon {$record->name} a été mis à jour avec succès.")
+                                ->success()
+                                ->send();
+                        } catch (\Exception $e) {
+                            Notification::make()
+                                ->title('Erreur de mise à jour')
+                                ->body("Impossible de mettre à jour l'addon : {$e->getMessage()}")
+                                ->danger()
+                                ->send();
+                        }
+                    }),
+                
+                Tables\Actions\ViewAction::make()
+                    ->label('Détails')
+                    ->modalHeading(fn (Addon $record) => $record->name)
+                    ->modalContent(function (Addon $record) {
+                        return view('filament.server.addon-details', ['addon' => $record]);
+                    })
+                    ->modalWidth('2xl'),
+            ])
+            ->bulkActions([])
+            ->defaultSort('downloads_count', 'desc')
+            ->poll('30s');
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        $server = filament()->getTenant();
+        
+        return parent::getEloquentQuery()
+            ->where('is_active', true)
+            ->whereJsonContains('supported_games', $server->egg->name ?? 'gmod');
+    }
+
+    public static function getPages(): array
+    {
+        return [
+            'index' => Pages\ListAddons::route('/'),
+        ];
+    }
+}
