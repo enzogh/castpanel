@@ -11,19 +11,31 @@ class ServerStatsWidget extends BaseWidget
     protected function getStats(): array
     {
         $user = auth()->user();
-        $allServers = $user->accessibleServers();
+        $allServers = $user->accessibleServers()->get();
         
         $runningServers = $allServers->filter(function ($server) {
-            return $server->retrieveStatus()->isRunning();
+            try {
+                return $server->retrieveStatus()->isRunning();
+            } catch (\Exception $e) {
+                return false;
+            }
         });
         
         $stoppedServers = $allServers->filter(function ($server) {
-            return $server->retrieveStatus()->isStopped();
+            try {
+                return $server->retrieveStatus()->isStopped();
+            } catch (\Exception $e) {
+                return false;
+            }
         });
 
         $totalMemoryUsage = $allServers->sum(function ($server) {
-            $resources = $server->retrieveResources();
-            return $resources['memory_bytes'] ?? 0;
+            try {
+                $resources = $server->retrieveResources();
+                return $resources['memory_bytes'] ?? 0;
+            } catch (\Exception $e) {
+                return 0;
+            }
         });
 
         $totalMemoryLimit = $allServers->sum('memory') * 1024 * 1024; // Convert MB to bytes

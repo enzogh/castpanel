@@ -11,10 +11,14 @@ class ServerOverviewWidget extends BaseWidget
     protected function getStats(): array
     {
         $user = auth()->user();
-        $allServers = $user->accessibleServers();
+        $allServers = $user->accessibleServers()->get();
         $myServers = $allServers->where('owner_id', $user->id);
         $onlineServers = $allServers->filter(function ($server) {
-            return $server->retrieveStatus()->isRunning();
+            try {
+                return $server->retrieveStatus()->isRunning();
+            } catch (\Exception $e) {
+                return false;
+            }
         });
 
         return [
