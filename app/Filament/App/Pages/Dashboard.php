@@ -28,11 +28,7 @@ class Dashboard extends BaseDashboard
     public function getWidgets(): array
     {
         return [
-            ServerOverviewWidget::class,
             RecentServersWidget::class,
-            AnnouncementsWidget::class,
-            TicketStatsWidget::class,
-            QuickTicketWidget::class,
         ];
     }
 

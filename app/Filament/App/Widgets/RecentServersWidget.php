@@ -10,14 +10,14 @@ use Filament\Widgets\TableWidget as BaseWidget;
 
 class RecentServersWidget extends BaseWidget
 {
-    protected static ?string $heading = 'Serveurs récents';
+    protected static ?string $heading = 'Mes serveurs';
 
-    protected int | string | array $columnSpan = 2;
+    protected int | string | array $columnSpan = 'full';
 
     public function table(Table $table): Table
     {
         $user = auth()->user();
-        $servers = $user->accessibleServers()->orderBy('updated_at', 'desc')->limit(5);
+        $servers = $user->accessibleServers()->orderBy('name', 'asc');
 
         return $table
             ->query($servers)
@@ -50,14 +50,9 @@ class RecentServersWidget extends BaseWidget
                     ->size('sm')
                     ->url(fn (Server $record) => \App\Filament\Server\Pages\Console::getUrl(panel: 'server', tenant: $record)),
             ])
-            ->headerActions([
-                Action::make('view_all')
-                    ->label('Voir tous')
-                    ->icon('tabler-arrow-right')
-                    ->color('gray')
-                    ->url('/app'),
-            ])
-            ->paginated(false)
+            ->headerActions([])
+            ->paginated(true)
+            ->defaultPaginationPageOption(10)
             ->poll('30s')
             ->emptyStateIcon('tabler-server-off')
             ->emptyStateHeading('Aucun serveur')
