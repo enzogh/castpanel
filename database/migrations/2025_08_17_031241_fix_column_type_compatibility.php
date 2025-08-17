@@ -43,14 +43,7 @@ return new class extends Migration
                 });
             }
 
-            // Table announcements
-            if (Schema::hasTable('announcements')) {
-                Schema::table('announcements', function (Blueprint $table) {
-                    if (Schema::hasColumn('announcements', 'author_id')) {
-                        $table->unsignedBigInteger('author_id')->change();
-                    }
-                });
-            }
+            // Table announcements - corrigée par une migration séparée
 
             // Table servers
             if (Schema::hasTable('servers')) {
@@ -134,14 +127,7 @@ return new class extends Migration
                 });
             }
 
-            // Table announcements
-            if (Schema::hasTable('announcements')) {
-                Schema::table('announcements', function (Blueprint $table) {
-                    if (Schema::hasColumn('announcements', 'author_id') && !$this->foreignKeyExists('announcements', 'announcements_author_id_foreign')) {
-                        $table->foreign('author_id')->references('id')->on('users')->onDelete('cascade');
-                    }
-                });
-            }
+            // Table announcements - contrainte de clé étrangère ajoutée par une migration séparée
 
         } catch (Exception $e) {
             // Log l'erreur mais ne pas faire échouer la migration
@@ -170,11 +156,7 @@ return new class extends Migration
             });
         }
 
-        if (Schema::hasTable('announcements')) {
-            Schema::table('announcements', function (Blueprint $table) {
-                $table->dropForeign(['author_id']);
-            });
-        }
+        // Table announcements - gérée par une migration séparée
     }
 
     /**
