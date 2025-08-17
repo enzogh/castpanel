@@ -4,6 +4,7 @@ namespace App\Filament\Server\Resources;
 
 use App\Filament\Server\Resources\InstalledAddonResource\Pages;
 use App\Models\ServerAddon;
+use App\Services\Addons\GmodAddonScannerService;
 use App\Services\Servers\AddonManagementService;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -80,6 +81,77 @@ class InstalledAddonResource extends Resource
                 Tables\Filters\SelectFilter::make('status')
                     ->label('Statut')
                     ->options(ServerAddon::getStatuses()),
+                
+                Tables\Filters\TernaryFilter::make('is_local')
+                    ->label('Type d\'addon')
+                    ->placeholder('Tous les addons')
+                    ->trueLabel('Addons locaux (détectés)')
+                    ->falseLabel('Addons du catalogue')
+                    ->queries(
+                        true: fn (Builder $query) => $query->whereNull('addon_id'),
+                        false: fn (Builder $query) => $query->whereNotNull('addon_id'),
+                    ),
+            ])
+            ->headerActions([
+                Tables\Actions\Action::make('scan_gmod_addons')
+                    ->label('Scanner addons Garry\'s Mod')
+                    ->icon('heroicon-o-magnifying-glass')
+                    ->color('info')
+                    ->visible(function () {
+                        $serverId = request()->route('tenant');
+                        if (!$serverId) return false;
+                        
+                        $server = \App\Models\Server::find($serverId);
+                        if (!$server) return false;
+                        
+                        $scanner = app(GmodAddonScannerService::class);
+                        return $scanner->isGmodServer($server);
+                    })
+                    ->requiresConfirmation()
+                    ->modalHeading('Scanner les addons installés')
+                    ->modalDescription('Cette action va scanner le répertoire garrysmod/addons pour détecter automatiquement les addons installés sur ce serveur Garry\'s Mod.')
+                    ->modalSubmitActionLabel('Scanner')
+                    ->action(function () {
+                        $serverId = request()->route('tenant');
+                        if (!$serverId) return;
+                        
+                        $server = \App\Models\Server::find($serverId);
+                        if (!$server) return;
+                        
+                        $scanner = app(GmodAddonScannerService::class);
+                        
+                        try {
+                            // Scanner les addons installés
+                            $detectedAddons = $scanner->scanInstalledAddons($server);
+                            
+                            // Synchroniser avec la base de données
+                            $syncResults = $scanner->syncDetectedAddons($server, $detectedAddons);
+                            
+                            $message = sprintf(
+                                'Scan terminé : %d addons ajoutés, %d mis à jour, %d supprimés.',
+                                $syncResults['added'],
+                                $syncResults['updated'],
+                                $syncResults['removed']
+                            );
+                            
+                            if (!empty($syncResults['errors'])) {
+                                $message .= ' Erreurs : ' . implode(', ', $syncResults['errors']);
+                            }
+                            
+                            Notification::make()
+                                ->title('Scan des addons terminé')
+                                ->body($message)
+                                ->success()
+                                ->send();
+                                
+                        } catch (\Exception $e) {
+                            Notification::make()
+                                ->title('Erreur lors du scan')
+                                ->body('Impossible de scanner les addons : ' . $e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    }),
             ])
             ->actions([
                 Tables\Actions\Action::make('enable')

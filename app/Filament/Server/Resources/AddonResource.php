@@ -5,6 +5,7 @@ namespace App\Filament\Server\Resources;
 use App\Filament\Server\Resources\AddonResource\Pages;
 use App\Models\Addon;
 use App\Models\ServerAddon;
+use App\Services\Addons\GmodAddonScannerService;
 use App\Services\Servers\AddonManagementService;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -261,6 +262,57 @@ class AddonResource extends Resource
                         return view('filament.server.addon-details', ['addon' => $record]);
                     })
                     ->modalWidth('2xl'),
+            ])
+            ->headerActions([
+                Tables\Actions\Action::make('scan_gmod_addons')
+                    ->label('Scanner les addons Garry\'s Mod')
+                    ->icon('heroicon-o-magnifying-glass')
+                    ->color('info')
+                    ->visible(function () {
+                        $server = filament()->getTenant();
+                        $scanner = app(GmodAddonScannerService::class);
+                        return $server && $scanner->isGmodServer($server);
+                    })
+                    ->requiresConfirmation()
+                    ->modalHeading('Scanner les addons installés')
+                    ->modalDescription('Cette action va scanner le répertoire garrysmod/addons pour détecter automatiquement les addons installés sur ce serveur.')
+                    ->modalSubmitActionLabel('Scanner')
+                    ->action(function () {
+                        $server = filament()->getTenant();
+                        $scanner = app(GmodAddonScannerService::class);
+                        
+                        try {
+                            // Scanner les addons installés
+                            $detectedAddons = $scanner->scanInstalledAddons($server);
+                            
+                            // Synchroniser avec la base de données
+                            $syncResults = $scanner->syncDetectedAddons($server, $detectedAddons);
+                            
+                            $message = sprintf(
+                                'Scan terminé : %d addons ajoutés, %d mis à jour, %d supprimés.',
+                                $syncResults['added'],
+                                $syncResults['updated'],
+                                $syncResults['removed']
+                            );
+                            
+                            if (!empty($syncResults['errors'])) {
+                                $message .= ' Erreurs : ' . implode(', ', $syncResults['errors']);
+                            }
+                            
+                            Notification::make()
+                                ->title('Scan des addons terminé')
+                                ->body($message)
+                                ->success()
+                                ->send();
+                                
+                        } catch (\Exception $e) {
+                            Notification::make()
+                                ->title('Erreur lors du scan')
+                                ->body('Impossible de scanner les addons : ' . $e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    }),
             ])
             ->bulkActions([])
             ->defaultSort('downloads_count', 'desc')
