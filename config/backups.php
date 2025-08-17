@@ -62,5 +62,29 @@ return [
 
             'storage_class' => env('AWS_BACKUPS_STORAGE_CLASS'),
         ],
+
+        // Configuration for storing backups via SFTP. This allows backups to be stored
+        // on remote servers accessible via SSH/SFTP protocol.
+        'sftp' => [
+            'adapter' => Backup::ADAPTER_SFTP,
+
+            // SFTP server configuration
+            'host' => env('SFTP_BACKUP_HOST'),
+            'port' => env('SFTP_BACKUP_PORT', 22),
+            'username' => env('SFTP_BACKUP_USERNAME'),
+            'password' => env('SFTP_BACKUP_PASSWORD'),
+            'private_key' => env('SFTP_BACKUP_PRIVATE_KEY'),
+            'passphrase' => env('SFTP_BACKUP_PASSPHRASE'),
+
+            // The remote directory where backups will be stored. Backups
+            // are stored within a folder using the server's UUID as the name.
+            'root' => env('SFTP_BACKUP_ROOT', '/backups'),
+
+            // Connection timeout in seconds
+            'timeout' => env('SFTP_BACKUP_TIMEOUT', 30),
+
+            // Whether to verify the host key
+            'verify_host_key' => env('SFTP_BACKUP_VERIFY_HOST_KEY', true),
+        ],
     ],
 ];

@@ -25,6 +25,7 @@ use Filament\Forms\Components\Tabs;
 use Filament\Forms\Components\Tabs\Tab;
 use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\ToggleButtons;
 use Filament\Forms\Concerns\InteractsWithForms;
@@ -461,6 +462,7 @@ class Settings extends Page implements HasForms
                 ->options([
                     Backup::ADAPTER_DAEMON => 'Wings',
                     Backup::ADAPTER_AWS_S3 => 'S3',
+                    Backup::ADAPTER_SFTP => 'SFTP',
                 ])
                 ->live()
                 ->default(env('APP_BACKUP_DRIVER', config('backups.default'))),
@@ -517,6 +519,73 @@ class Settings extends Page implements HasForms
                         ->formatStateUsing(fn ($state): bool => (bool) $state)
                         ->afterStateUpdated(fn ($state, Set $set) => $set('AWS_USE_PATH_STYLE_ENDPOINT', (bool) $state))
                         ->default(env('AWS_USE_PATH_STYLE_ENDPOINT', config('backups.disks.s3.use_path_style_endpoint'))),
+                ]),
+            Section::make('Configuration SFTP')
+                ->description('Configuration pour stocker les sauvegardes via SFTP sur un serveur distant.')
+                ->columns()
+                ->visible(fn (Get $get) => $get('APP_BACKUP_DRIVER') === Backup::ADAPTER_SFTP)
+                ->schema([
+                    TextInput::make('SFTP_BACKUP_HOST')
+                        ->label('Hôte SFTP')
+                        ->placeholder('exemple.com')
+                        ->required()
+                        ->default(config('backups.disks.sftp.host')),
+                    TextInput::make('SFTP_BACKUP_PORT')
+                        ->label('Port')
+                        ->numeric()
+                        ->minValue(1)
+                        ->maxValue(65535)
+                        ->placeholder('22')
+                        ->default(config('backups.disks.sftp.port')),
+                    TextInput::make('SFTP_BACKUP_USERNAME')
+                        ->label('Nom d\'utilisateur')
+                        ->required()
+                        ->default(config('backups.disks.sftp.username')),
+                    TextInput::make('SFTP_BACKUP_PASSWORD')
+                        ->label('Mot de passe')
+                        ->password()
+                        ->revealable()
+                        ->helperText('Laisser vide si vous utilisez une clé privée')
+                        ->default(env('SFTP_BACKUP_PASSWORD')),
+                    Textarea::make('SFTP_BACKUP_PRIVATE_KEY')
+                        ->label('Clé privée SSH')
+                        ->placeholder('-----BEGIN OPENSSH PRIVATE KEY-----
+...
+-----END OPENSSH PRIVATE KEY-----')
+                        ->helperText('Coller ici votre clé privée SSH (optionnel, alternative au mot de passe)')
+                        ->rows(6)
+                        ->columnSpanFull()
+                        ->default(env('SFTP_BACKUP_PRIVATE_KEY')),
+                    TextInput::make('SFTP_BACKUP_PASSPHRASE')
+                        ->label('Phrase de passe de la clé privée')
+                        ->password()
+                        ->revealable()
+                        ->helperText('Si votre clé privée est protégée par une phrase de passe')
+                        ->default(env('SFTP_BACKUP_PASSPHRASE')),
+                    TextInput::make('SFTP_BACKUP_ROOT')
+                        ->label('Répertoire racine')
+                        ->placeholder('/backups')
+                        ->helperText('Répertoire où les sauvegardes seront stockées')
+                        ->default(config('backups.disks.sftp.root')),
+                    TextInput::make('SFTP_BACKUP_TIMEOUT')
+                        ->label('Timeout de connexion')
+                        ->numeric()
+                        ->minValue(5)
+                        ->maxValue(300)
+                        ->suffix('secondes')
+                        ->placeholder('30')
+                        ->default(config('backups.disks.sftp.timeout')),
+                    Toggle::make('SFTP_BACKUP_VERIFY_HOST_KEY')
+                        ->label('Vérifier la clé de l\'hôte')
+                        ->helperText('Recommandé pour la sécurité')
+                        ->inline(false)
+                        ->onIcon('tabler-check')
+                        ->offIcon('tabler-x')
+                        ->onColor('success')
+                        ->offColor('danger')
+                        ->formatStateUsing(fn ($state): bool => (bool) $state)
+                        ->afterStateUpdated(fn ($state, Set $set) => $set('SFTP_BACKUP_VERIFY_HOST_KEY', (bool) $state))
+                        ->default(env('SFTP_BACKUP_VERIFY_HOST_KEY', config('backups.disks.sftp.verify_host_key'))),
                 ]),
         ];
     }
