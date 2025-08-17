@@ -36,8 +36,8 @@ class LuaListCommand extends Command
             ],
             [
                 'command' => 'lua:scan',
-                'description' => 'Scanner les addons et scripts Lua sur les serveurs (--server=test pour mode test)',
-                'usage' => 'php artisan lua:scan [--server=ID|test] [--path=chemin]'
+                'description' => 'Scanner les addons et scripts Lua sur les serveurs (--server=test pour mode test, --debug pour debug complet)',
+                'usage' => 'php artisan lua:scan [--server=ID|test] [--path=chemin] [--debug]'
             ],
             [
                 'command' => 'lua:list',
@@ -57,6 +57,7 @@ class LuaListCommand extends Command
         $this->line('   php artisan lua:monitor --server=1');
         $this->line('   php artisan lua:scan --server=1');
         $this->line('   php artisan lua:scan --server=test  # Mode test sans base de données');
+        $this->line('   php artisan lua:scan --debug         # Debug complet détaillé');
         $this->line('   php artisan lua:scan --path=garrysmod/addons');
         
         return 0;
