@@ -30,14 +30,12 @@ class AllocationResource extends Resource
 
     protected static ?string $model = Allocation::class;
 
-    protected static ?int $navigationSort = 7;
-
     protected static ?string $navigationIcon = 'tabler-network';
 
-    public static function getNavigationGroup(): ?string
-    {
-        return 'Configuration';
-    }
+    protected static ?string $navigationGroup = 'Gestion';
+
+    protected static ?int $navigationSort = 7;
+
 
     public static function defaultTable(Table $table): Table
     {

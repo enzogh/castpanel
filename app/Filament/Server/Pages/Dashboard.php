@@ -10,6 +10,8 @@ class Dashboard extends BaseDashboard
 {
     protected static ?string $navigationIcon = 'heroicon-o-home';
 
+    protected static ?string $navigationGroup = 'Tableau de bord';
+
     protected static ?string $title = 'Tableau de bord';
 
     public function getColumns(): int | string | array

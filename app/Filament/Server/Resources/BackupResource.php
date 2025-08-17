@@ -52,16 +52,14 @@ class BackupResource extends Resource
 
     protected static ?string $model = Backup::class;
 
-    protected static ?int $navigationSort = 3;
-
     protected static ?string $navigationIcon = 'tabler-database-backup';
+
+    protected static ?string $navigationGroup = 'Outils et surveillance';
+
+    protected static ?int $navigationSort = 1;
 
     protected static bool $canCreateAnother = false;
 
-    public static function getNavigationGroup(): ?string
-    {
-        return 'Gestion du serveur';
-    }
 
     protected static function getBadgeCount(): int
     {

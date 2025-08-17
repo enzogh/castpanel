@@ -46,16 +46,24 @@ class ServerPanelProvider extends PanelProvider
                     ->sort(99),
             ])
             ->navigationGroups([
-                NavigationGroup::make('Gestion du serveur')
+                NavigationGroup::make('Tableau de bord')
+                    ->icon('heroicon-o-home')
+                    ->collapsible(false),
+                NavigationGroup::make('Gestion')
+                    ->icon('heroicon-o-cog-6-tooth')
+                    ->collapsible(true)
+                    ->collapsed(false),
+                NavigationGroup::make('Support')
+                    ->icon('heroicon-o-lifebuoy')
                     ->collapsible(true)
                     ->collapsed(false),
                 NavigationGroup::make('Outils et surveillance')
-                    ->collapsible(true)
-                    ->collapsed(false),
-                NavigationGroup::make('Configuration')
+                    ->icon('heroicon-o-chart-bar')
                     ->collapsible(true)
                     ->collapsed(false),
             ])
+            ->sidebarCollapsibleOnDesktop()
+            ->sidebarFullyCollapsibleOnDesktop()
             ->discoverResources(in: app_path('Filament/Server/Resources'), for: 'App\\Filament\\Server\\Resources')
             ->discoverPages(in: app_path('Filament/Server/Pages'), for: 'App\\Filament\\Server\\Pages')
             ->discoverWidgets(in: app_path('Filament/Server/Widgets'), for: 'App\\Filament\\Server\\Widgets')

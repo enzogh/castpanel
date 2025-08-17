@@ -23,12 +23,10 @@ class FileResource extends Resource
 
     protected static ?int $navigationSort = 2;
 
+    protected static ?string $navigationGroup = 'Gestion';
+
     protected static ?string $navigationIcon = 'tabler-files';
 
-    public static function getNavigationGroup(): ?string
-    {
-        return 'Gestion du serveur';
-    }
 
     public static function canViewAny(): bool
     {

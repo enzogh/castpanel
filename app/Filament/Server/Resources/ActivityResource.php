@@ -38,14 +38,12 @@ class ActivityResource extends Resource
 
     protected static ?string $model = ActivityLog::class;
 
-    protected static ?int $navigationSort = 8;
-
     protected static ?string $navigationIcon = 'tabler-stack';
 
-    public static function getNavigationGroup(): ?string
-    {
-        return 'Outils et surveillance';
-    }
+    protected static ?string $navigationGroup = 'Outils et surveillance';
+
+    protected static ?int $navigationSort = 2;
+
 
     public static function defaultTable(Table $table): Table
     {

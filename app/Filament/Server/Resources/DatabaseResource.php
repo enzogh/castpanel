@@ -38,14 +38,12 @@ class DatabaseResource extends Resource
 
     protected static ?string $model = Database::class;
 
-    protected static ?int $navigationSort = 4;
-
     protected static ?string $navigationIcon = 'tabler-database';
 
-    public static function getNavigationGroup(): ?string
-    {
-        return 'Gestion du serveur';
-    }
+    protected static ?string $navigationGroup = 'Gestion';
+
+    protected static ?int $navigationSort = 3;
+
 
     protected static function getBadgeCount(): int
     {
