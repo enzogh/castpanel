@@ -14,7 +14,6 @@ class AppPanelProvider extends PanelProvider
             ->id('app')
             ->default()
             ->breadcrumbs(false)
-            ->navigation(false)
             ->userMenuItems([
                 MenuItem::make()
                     ->label(trans('profile.admin'))
@@ -24,6 +23,7 @@ class AppPanelProvider extends PanelProvider
                     ->visible(fn () => auth()->user()->canAccessPanel(Filament::getPanel('admin'))),
             ])
             ->discoverResources(in: app_path('Filament/App/Resources'), for: 'App\\Filament\\App\\Resources')
-            ->discoverPages(in: app_path('Filament/App/Pages'), for: 'App\\Filament\\App\\Pages');
+            ->discoverPages(in: app_path('Filament/App/Pages'), for: 'App\\Filament\\App\\Pages')
+            ->discoverWidgets(in: app_path('Filament/App/Widgets'), for: 'App\\Filament\\App\\Widgets');
     }
 }

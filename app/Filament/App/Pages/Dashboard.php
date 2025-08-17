@@ -2,19 +2,29 @@
 
 namespace App\Filament\App\Pages;
 
-use Filament\Pages\Page;
+use App\Filament\App\Widgets\AnnouncementsWidget;
+use App\Filament\App\Widgets\QuickTicketWidget;
+use App\Filament\App\Resources\TicketResource\Widgets\TicketStatsWidget;
+use Filament\Pages\Dashboard as BaseDashboard;
 
-class Dashboard extends Page
+class Dashboard extends BaseDashboard
 {
     protected static ?string $navigationIcon = 'tabler-layout-dashboard';
 
-    protected static string $view = 'filament.app.pages.dashboard';
-
     protected static ?string $title = 'Tableau de bord';
 
-    public function getColumns(): int
+    public function getColumns(): int | string | array
     {
-        return 1;
+        return 2;
+    }
+
+    public function getWidgets(): array
+    {
+        return [
+            AnnouncementsWidget::class,
+            TicketStatsWidget::class,
+            QuickTicketWidget::class,
+        ];
     }
 
     public function getHeading(): string
