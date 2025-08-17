@@ -15,7 +15,7 @@ class ServerOverviewWidget extends BaseWidget
         $myServers = $allServers->where('owner_id', $user->id);
         $onlineServers = $allServers->filter(function ($server) {
             try {
-                return $server->retrieveStatus()->isRunning();
+                return $server->retrieveStatus() === \App\Enums\ContainerStatus::Running;
             } catch (\Exception $e) {
                 return false;
             }

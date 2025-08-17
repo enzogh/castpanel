@@ -15,7 +15,7 @@ class ServerStatsWidget extends BaseWidget
         
         $runningServers = $allServers->filter(function ($server) {
             try {
-                return $server->retrieveStatus()->isRunning();
+                return $server->retrieveStatus() === \App\Enums\ContainerStatus::Running;
             } catch (\Exception $e) {
                 return false;
             }
@@ -23,7 +23,12 @@ class ServerStatsWidget extends BaseWidget
         
         $stoppedServers = $allServers->filter(function ($server) {
             try {
-                return $server->retrieveStatus()->isStopped();
+                $status = $server->retrieveStatus();
+                return in_array($status, [
+                    \App\Enums\ContainerStatus::Exited,
+                    \App\Enums\ContainerStatus::Offline,
+                    \App\Enums\ContainerStatus::Dead
+                ]);
             } catch (\Exception $e) {
                 return false;
             }
