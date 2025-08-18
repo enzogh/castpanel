@@ -148,44 +148,29 @@ class MessagesRelationManager extends RelationManager
             // Vérifier que la relation messages existe
             if (!$this->ownerRecord || !method_exists($this->ownerRecord, 'messages')) {
                 Log::warning('MessagesRelationManager: ownerRecord ou relation messages manquante');
-                // Retourner une requête vide en utilisant DB directement
-                try {
-                    $query = DB::table('ticket_messages')->whereRaw('1 = 0')->getQuery();
-                    if ($query) {
-                        return $query;
-                    }
-                } catch (\Exception $dbError) {
-                    Log::error('MessagesRelationManager: Erreur DB::table()', [
-                        'error' => $dbError->getMessage(),
-                    ]);
-                }
-                
-                // Si DB::table() échoue, créer une requête vide manuellement
+                // Retourner une requête vide
                 return \Illuminate\Database\Eloquent\Builder::query(\DB::connection());
             }
             
-            return parent::getTableQuery()
+            // Vérifier que parent::getTableQuery() retourne une requête valide
+            $parentQuery = parent::getTableQuery();
+            
+            if (!$parentQuery) {
+                Log::warning('MessagesRelationManager: parent::getTableQuery() retourne null');
+                // Retourner une requête vide
+                return \Illuminate\Database\Eloquent\Builder::query(\DB::connection());
+            }
+            
+            return $parentQuery
                 ->where('is_internal', false) // Ne montrer que les messages non-internes aux clients
                 ->with('user');
+                
         } catch (\Exception $e) {
             Log::error('MessagesRelationManager: Erreur dans getTableQuery', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
             ]);
             
-            // En cas d'erreur, créer une requête vide manuellement
-            try {
-                $query = DB::table('ticket_messages')->whereRaw('1 = 0')->getQuery();
-                if ($query) {
-                    return $query;
-                }
-            } catch (\Exception $dbError) {
-                Log::error('MessagesRelationManager: Erreur DB::table() dans catch', [
-                    'error' => $dbError->getMessage(),
-                ]);
-            }
-            
-            // Dernier recours : requête vide manuelle
+            // Retourner une requête vide en cas d'erreur
             return \Illuminate\Database\Eloquent\Builder::query(\DB::connection());
         }
     }

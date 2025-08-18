@@ -242,30 +242,15 @@ class TicketResource extends Resource
             ]);
     }
 
-    public static function getEloquentQuery(): Builder
+        public static function getEloquentQuery(): Builder
     {
         $serverId = request()->route('tenant');
         $userId = auth()->id();
-        
-        // Log pour débogage
-        \Log::info('TicketResource::getEloquentQuery - FORCING all tickets', [
-            'server_id' => $serverId,
-            'user_id' => $userId,
-            'route' => request()->route()->getName(),
-            'url' => request()->url(),
-        ]);
-        
-        // FORCER l'affichage de tous les tickets sans filtres pour déboguer
-        $query = parent::getEloquentQuery()
+
+        return parent::getEloquentQuery()
+            ->where('user_id', $userId)
+            ->where('server_id', $serverId)
             ->with(['server', 'assignedTo', 'messages']);
-        
-        // Log de la requête SQL générée
-        \Log::info('Ticket query SQL (no filters)', [
-            'sql' => $query->toSql(),
-            'bindings' => $query->getBindings(),
-        ]);
-        
-        return $query;
     }
 
     public static function getRelations(): array
