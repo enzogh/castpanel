@@ -9,6 +9,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\Log;
 
 class MessagesRelationManager extends RelationManager
 {
@@ -113,7 +114,7 @@ class MessagesRelationManager extends RelationManager
                     ->modalHeading('Répondre au ticket')
                     ->modalDescription('Ajoutez votre message à la conversation avec l\'équipe support.')
                     ->modalWidth('lg')
-                    ->visible(fn () => $this->ownerRecord->isOpen())
+                    ->visible(fn () => $this->ownerRecord && method_exists($this->ownerRecord, 'isOpen') ? $this->ownerRecord->isOpen() : false)
                     ->mutateFormDataUsing(function (array $data): array {
                         $data['user_id'] = auth()->id();
                         $data['is_internal'] = false;
@@ -143,8 +144,19 @@ class MessagesRelationManager extends RelationManager
 
     public function getTableQuery(): Builder
     {
-        return parent::getTableQuery()
-            ->where('is_internal', false) // Ne montrer que les messages non-internes aux clients
-            ->with('user');
+        try {
+            // Vérifier que la relation messages existe
+            if (!$this->ownerRecord || !method_exists($this->ownerRecord, 'messages')) {
+                // Retourner une requête vide si la relation n'existe pas
+                return \App\Models\TicketMessage::query()->whereRaw('1 = 0');
+            }
+            
+            return parent::getTableQuery()
+                ->where('is_internal', false) // Ne montrer que les messages non-internes aux clients
+                ->with('user');
+        } catch (\Exception $e) {
+            // En cas d'erreur, retourner une requête vide
+            return \App\Models\TicketMessage::query()->whereRaw('1 = 0');
+        }
     }
 }

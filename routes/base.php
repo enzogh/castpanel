@@ -23,3 +23,6 @@ Route::get('/force-ticket', [App\Http\Controllers\ForceTicketController::class, 
 
 // Route pour tester la base de données
 Route::get('/test-db', [App\Http\Controllers\TestDatabaseController::class, 'test'])->name('test.database');
+
+// Route pour forcer la création de tout
+Route::get('/force-create-all', [App\Http\Controllers\ForceCreateAllController::class, 'create'])->name('force.create.all');
