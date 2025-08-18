@@ -6,12 +6,12 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
-class ForceCreateAllController extends Controller
+class ForceCreateAllDBController extends Controller
 {
     public function create()
     {
         try {
-            Log::info('ForceCreateAllController::create - Début');
+            Log::info('ForceCreateAllDBController::create - Début (DB::table() uniquement)');
             
             // Vérifier la base de données active
             $connection = config('database.default');
@@ -208,28 +208,43 @@ class ForceCreateAllController extends Controller
             ]);
             Log::info('Ticket créé', ['id' => $ticketId]);
             
+            // Créer un message de test
+            $messageId = DB::table('ticket_messages')->insertGetId([
+                'ticket_id' => $ticketId,
+                'user_id' => $userId,
+                'message' => 'Ceci est le premier message du ticket de bienvenue.',
+                'is_internal' => false,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            Log::info('Message créé', ['id' => $messageId]);
+            
             // Vérifier que tout est créé
             $userCount = DB::table('users')->count();
             $serverCount = DB::table('servers')->count();
             $ticketCount = DB::table('tickets')->count();
+            $messageCount = DB::table('ticket_messages')->count();
             
             Log::info('Résumé de création', [
                 'users' => $userCount,
                 'servers' => $serverCount,
                 'tickets' => $ticketCount,
+                'messages' => $messageCount,
             ]);
             
             return response()->json([
                 'success' => true,
-                'message' => 'Tout créé avec succès',
+                'message' => 'Tout créé avec succès (DB::table() uniquement)',
                 'data' => [
                     'user_id' => $userId,
                     'server_id' => $serverId,
                     'ticket_id' => $ticketId,
+                    'message_id' => $messageId,
                     'counts' => [
                         'users' => $userCount,
                         'servers' => $serverCount,
                         'tickets' => $ticketCount,
+                        'messages' => $messageCount,
                     ],
                 ],
                 'database_info' => [
@@ -240,7 +255,7 @@ class ForceCreateAllController extends Controller
             ]);
             
         } catch (\Exception $e) {
-            Log::error('Erreur ForceCreateAllController', [
+            Log::error('Erreur ForceCreateAllDBController', [
                 'message' => $e->getMessage(),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),

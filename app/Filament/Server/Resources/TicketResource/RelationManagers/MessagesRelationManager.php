@@ -147,16 +147,21 @@ class MessagesRelationManager extends RelationManager
         try {
             // Vérifier que la relation messages existe
             if (!$this->ownerRecord || !method_exists($this->ownerRecord, 'messages')) {
-                // Retourner une requête vide si la relation n'existe pas
-                return \App\Models\TicketMessage::query()->whereRaw('1 = 0');
+                Log::warning('MessagesRelationManager: ownerRecord ou relation messages manquante');
+                // Retourner une requête vide en utilisant DB directement
+                return DB::table('ticket_messages')->whereRaw('1 = 0')->getQuery();
             }
             
             return parent::getTableQuery()
                 ->where('is_internal', false) // Ne montrer que les messages non-internes aux clients
                 ->with('user');
         } catch (\Exception $e) {
-            // En cas d'erreur, retourner une requête vide
-            return \App\Models\TicketMessage::query()->whereRaw('1 = 0');
+            Log::error('MessagesRelationManager: Erreur dans getTableQuery', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            // En cas d'erreur, retourner une requête vide en utilisant DB directement
+            return DB::table('ticket_messages')->whereRaw('1 = 0')->getQuery();
         }
     }
 }
