@@ -118,7 +118,14 @@ class MessagesRelationManager extends RelationManager
 
     public function getTableQuery(): Builder
     {
-        return parent::getTableQuery()
+        $query = parent::getTableQuery();
+        
+        // Vérifier si la query est null et la créer si nécessaire
+        if (!$query) {
+            $query = $this->getOwnerRecord()->messages();
+        }
+        
+        return $query
             ->where('is_internal', false) // Ne montrer que les messages non-internes aux clients
             ->with('user');
     }
