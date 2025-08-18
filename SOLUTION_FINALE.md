@@ -4,6 +4,7 @@
 
 1. **Erreur Scramble** : Configuration temporairement désactivée
 2. **Erreur 404 des tickets** : Migration créée pour insérer un ticket par défaut
+3. **Erreur RouteMatched** : Méthodes corrigées dans AppServiceProvider
 
 ## 🔧 Comment résoudre maintenant
 
@@ -35,6 +36,8 @@ LIMIT 1;
 INSERT INTO ticket_messages (ticket_id, user_id, message, is_internal, created_at, updated_at)
 VALUES (1, (SELECT user_id FROM tickets WHERE id = 1), 'Bienvenue ! Ce ticket a été créé automatiquement.', false, NOW(), NOW());
 ```
+
+**Alternative** : Utilisez le fichier `create_ticket.sql` créé dans votre projet.
 
 ### Étape 2 : Vérifier que ça fonctionne
 
@@ -80,6 +83,11 @@ Après avoir appliqué la solution SQL :
 - ✅ `/server/1/tickets` → Liste des tickets visible
 - ✅ `/server/1/tickets/1` → Ticket de bienvenue visible
 - ✅ `/server/1/tickets/2` → Deuxième ticket visible (si créé)
+
+## 🐛 Erreurs corrigées
+
+- **RouteMatched::getName()** : Remplacé par les bonnes propriétés de l'événement
+- **Scramble API** : Temporairement désactivé pour éviter les erreurs de dépendances
 
 ---
 

@@ -54,9 +54,8 @@ class AppServiceProvider extends ServiceProvider
         // Log des routes pour débogage
         Route::matched(function ($route) {
             Log::info('Route matched', [
-                'name' => $route->getName(),
                 'uri' => $route->uri(),
-                'parameters' => $route->parameters(),
+                'methods' => $route->methods(),
                 'middleware' => $route->middleware(),
             ]);
         });
