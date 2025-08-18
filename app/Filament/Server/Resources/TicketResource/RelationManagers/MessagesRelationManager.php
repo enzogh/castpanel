@@ -10,6 +10,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class MessagesRelationManager extends RelationManager
 {
@@ -149,7 +150,7 @@ class MessagesRelationManager extends RelationManager
             if (!$this->ownerRecord || !method_exists($this->ownerRecord, 'messages')) {
                 Log::warning('MessagesRelationManager: ownerRecord ou relation messages manquante');
                 // Retourner une requête vide
-                return \Illuminate\Database\Eloquent\Builder::query(\DB::connection());
+                return \Illuminate\Database\Eloquent\Builder::query(DB::connection());
             }
             
             // Vérifier que parent::getTableQuery() retourne une requête valide
@@ -158,7 +159,7 @@ class MessagesRelationManager extends RelationManager
             if (!$parentQuery) {
                 Log::warning('MessagesRelationManager: parent::getTableQuery() retourne null');
                 // Retourner une requête vide
-                return \Illuminate\Database\Eloquent\Builder::query(\DB::connection());
+                return \Illuminate\Database\Eloquent\Builder::query(DB::connection());
             }
             
             return $parentQuery
@@ -171,7 +172,7 @@ class MessagesRelationManager extends RelationManager
             ]);
             
             // Retourner une requête vide en cas d'erreur
-            return \Illuminate\Database\Eloquent\Builder::query(\DB::connection());
+            return \Illuminate\Database\Eloquent\Builder::query(DB::connection());
         }
     }
 }
