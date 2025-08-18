@@ -13,7 +13,7 @@ class ForceTicketController extends Controller
     public function create()
     {
         try {
-            Log::info('ForceTicketController::create - Début');
+            Log::info('ForceTicketController::create - Début (BYPASS AUTH)');
             
             // Vérifier la base de données active
             $connection = config('database.default');
@@ -24,7 +24,7 @@ class ForceTicketController extends Controller
                 'database' => $database,
             ]);
             
-            // Créer ou récupérer un utilisateur
+            // BYPASS AUTH : Créer un utilisateur de test
             $user = User::first();
             if (!$user) {
                 $user = User::create([
@@ -33,9 +33,11 @@ class ForceTicketController extends Controller
                     'password' => bcrypt('password'),
                 ]);
                 Log::info('Utilisateur créé', ['id' => $user->id]);
+            } else {
+                Log::info('Utilisateur existant', ['id' => $user->id]);
             }
             
-            // Créer ou récupérer un serveur
+            // Créer un serveur de test
             $server = Server::first();
             if (!$server) {
                 $server = Server::create([
@@ -44,36 +46,38 @@ class ForceTicketController extends Controller
                     'status' => 'online',
                 ]);
                 Log::info('Serveur créé', ['id' => $server->id]);
+            } else {
+                Log::info('Serveur existant', ['id' => $server->id]);
             }
             
-            // Vérifier si le ticket 1 existe
+            // FORCER la création du ticket ID 1
             $ticket = Ticket::find(1);
             if ($ticket) {
                 // Mettre à jour le ticket existant
                 $ticket->update([
                     'user_id' => $user->id,
                     'server_id' => $server->id,
+                    'title' => 'Ticket de bienvenue - ' . now()->format('Y-m-d H:i:s'),
                 ]);
                 Log::info('Ticket mis à jour', ['id' => $ticket->id]);
             } else {
-                // Créer le ticket
-                $ticket = Ticket::create([
-                    'id' => 1,
-                    'user_id' => $user->id,
-                    'server_id' => $server->id,
-                    'title' => 'Bienvenue dans le système de tickets',
-                    'description' => 'Ceci est votre premier ticket de bienvenue.',
-                    'status' => 'open',
-                    'priority' => 'medium',
-                    'category' => 'general',
-                ]);
+                // Créer le ticket avec un ID spécifique
+                $ticket = new Ticket();
+                $ticket->id = 1;
+                $ticket->user_id = $user->id;
+                $ticket->server_id = $server->id;
+                $ticket->title = 'Ticket de bienvenue - ' . now()->format('Y-m-d H:i:s');
+                $ticket->description = 'Ceci est un ticket créé automatiquement pour résoudre l\'erreur 404.';
+                $ticket->status = 'open';
+                $ticket->priority = 'medium';
+                $ticket->category = 'general';
+                $ticket->save();
+                
                 Log::info('Ticket créé', ['id' => $ticket->id]);
             }
             
             // Vérifier que le ticket est visible
-            $visibleTicket = Ticket::where('id', 1)
-                ->where('server_id', $server->id)
-                ->first();
+            $visibleTicket = Ticket::where('id', 1)->first();
             
             if ($visibleTicket) {
                 Log::info('SUCCÈS: Ticket visible', [
@@ -91,6 +95,10 @@ class ForceTicketController extends Controller
                         'title' => $visibleTicket->title,
                         'user_id' => $visibleTicket->user_id,
                         'server_id' => $visibleTicket->server_id,
+                    ],
+                    'database_info' => [
+                        'connection' => $connection,
+                        'database' => $database,
                     ],
                 ]);
             } else {

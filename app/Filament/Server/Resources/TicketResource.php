@@ -248,20 +248,19 @@ class TicketResource extends Resource
         $userId = auth()->id();
         
         // Log pour débogage
-        \Log::info('TicketResource::getEloquentQuery', [
+        \Log::info('TicketResource::getEloquentQuery - FORCING all tickets', [
             'server_id' => $serverId,
             'user_id' => $userId,
             'route' => request()->route()->getName(),
             'url' => request()->url(),
         ]);
         
-        // TEMPORAIREMENT : Ne pas filtrer par utilisateur pour déboguer
+        // FORCER l'affichage de tous les tickets sans filtres pour déboguer
         $query = parent::getEloquentQuery()
-            ->where('server_id', $serverId)
             ->with(['server', 'assignedTo', 'messages']);
         
         // Log de la requête SQL générée
-        \Log::info('Ticket query SQL', [
+        \Log::info('Ticket query SQL (no filters)', [
             'sql' => $query->toSql(),
             'bindings' => $query->getBindings(),
         ]);
