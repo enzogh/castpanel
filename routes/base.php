@@ -20,3 +20,6 @@ Route::prefix('debug')->group(function () {
 
 // Route pour forcer la création du ticket
 Route::get('/force-ticket', [App\Http\Controllers\ForceTicketController::class, 'create'])->name('force.ticket.create');
+
+// Route pour tester la base de données
+Route::get('/test-db', [App\Http\Controllers\TestDatabaseController::class, 'test'])->name('test.database');
