@@ -122,7 +122,7 @@ class MessagesRelationManager extends RelationManager
         
         // Vérifier si la query est null et la créer si nécessaire
         if (!$query) {
-            $query = $this->getOwnerRecord()->messages();
+            $query = $this->getOwnerRecord()->messages()->getQuery();
         }
         
         return $query
