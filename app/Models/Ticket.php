@@ -99,6 +99,50 @@ class Ticket extends Model
         return in_array($this->status, [self::STATUS_OPEN, self::STATUS_IN_PROGRESS, self::STATUS_PENDING]);
     }
 
+    /**
+     * Créer un ticket par défaut si aucun n'existe
+     */
+    public static function createDefaultTicketIfNeeded(): ?self
+    {
+        // Vérifier si des tickets existent déjà
+        if (self::count() > 0) {
+            return null;
+        }
+
+        try {
+            // Récupérer le premier utilisateur et serveur
+            $user = \App\Models\User::first();
+            $server = \App\Models\Server::first();
+
+            if (!$user || !$server) {
+                return null;
+            }
+
+            // Créer un ticket par défaut
+            $ticket = self::create([
+                'user_id' => $user->id,
+                'server_id' => $server->id,
+                'title' => 'Bienvenue dans le système de tickets',
+                'description' => 'Ce ticket a été créé automatiquement pour vous permettre de commencer à utiliser le système de support.',
+                'status' => self::STATUS_OPEN,
+                'priority' => self::PRIORITY_LOW,
+                'category' => self::CATEGORY_GENERAL,
+            ]);
+
+            // Créer un message initial
+            \App\Models\TicketMessage::create([
+                'ticket_id' => $ticket->id,
+                'user_id' => $user->id,
+                'message' => 'Bienvenue ! Ce ticket a été créé automatiquement.',
+                'is_internal' => false,
+            ]);
+
+            return $ticket;
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
     public function isClosed(): bool
     {
         return in_array($this->status, [self::STATUS_RESOLVED, self::STATUS_CLOSED]);

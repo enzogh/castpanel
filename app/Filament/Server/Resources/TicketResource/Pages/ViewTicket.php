@@ -13,11 +13,7 @@ class ViewTicket extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\Action::make('back_to_list')
-                ->label('Retour aux tickets')
-                ->icon('heroicon-o-arrow-left')
-                ->url($this->getResource()::getUrl('index', ['tenant' => request()->route('tenant')]))
-                ->color('gray'),
+            Actions\EditAction::make(),
         ];
     }
 
