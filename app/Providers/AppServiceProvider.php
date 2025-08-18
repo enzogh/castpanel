@@ -5,10 +5,6 @@ namespace App\Providers;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Route;
-// use Dedoc\Scramble\Scramble;
-// use Dedoc\Scramble\Support\Generator\OpenApi;
-// use Dedoc\Scramble\Support\Generator\SecurityScheme;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -50,14 +46,5 @@ class AppServiceProvider extends ServiceProvider
                 ]);
             });
         }
-
-        // Log des routes pour débogage
-        Route::matched(function ($route) {
-            Log::info('Route matched', [
-                'uri' => $route->uri(),
-                'methods' => $route->methods(),
-                'middleware' => $route->middleware(),
-            ]);
-        });
     }
 }

@@ -4,11 +4,24 @@
 
 1. **Erreur Scramble** : Configuration temporairement désactivée
 2. **Erreur 404 des tickets** : Migration créée pour insérer un ticket par défaut
-3. **Erreur RouteMatched** : Méthodes corrigées dans AppServiceProvider
+3. **Erreur RouteMatched** : Logging des routes supprimé pour éviter les erreurs
 
 ## 🔧 Comment résoudre maintenant
 
-### Étape 1 : Créer le ticket manuellement dans la base de données
+### Option 1 : Script PHP (recommandé)
+
+Exécutez le script PHP créé :
+
+```bash
+php create_ticket.php
+```
+
+**Avantages** : 
+- Pas besoin de Composer
+- Gestion d'erreurs intégrée
+- Configuration automatique
+
+### Option 2 : SQL manuel
 
 Exécutez ce SQL directement dans votre base de données :
 
@@ -37,37 +50,35 @@ INSERT INTO ticket_messages (ticket_id, user_id, message, is_internal, created_a
 VALUES (1, (SELECT user_id FROM tickets WHERE id = 1), 'Bienvenue ! Ce ticket a été créé automatiquement.', false, NOW(), NOW());
 ```
 
-**Alternative** : Utilisez le fichier `create_ticket.sql` créé dans votre projet.
+### Option 3 : Fichier SQL
 
-### Étape 2 : Vérifier que ça fonctionne
+Utilisez le fichier `create_ticket.sql` créé dans votre projet.
 
+## 🔧 Configuration du script PHP
+
+Si vous utilisez le script PHP, ajustez la configuration de base de données dans `create_ticket.php` :
+
+```php
+$dbConfig = [
+    'host' => 'localhost',
+    'dbname' => 'castpanel', // Votre nom de base de données
+    'username' => 'root',     // Votre nom d'utilisateur
+    'password' => '',         // Votre mot de passe
+    'charset' => 'utf8mb4'
+];
+```
+
+## 📋 Vérification
+
+Après avoir appliqué une des solutions :
 1. Accédez à `/server/1/tickets` - vous devriez voir la liste des tickets
 2. Accédez à `/server/1/tickets/1` - vous devriez voir le ticket de bienvenue
-
-### Étape 3 : Créer d'autres tickets si nécessaire
-
-```sql
--- Créer un deuxième ticket
-INSERT INTO tickets (id, user_id, server_id, title, description, status, priority, category, created_at, updated_at)
-SELECT 
-    2,
-    u.id,
-    s.id,
-    'Support technique',
-    'Ticket pour les demandes de support technique.',
-    'open',
-    'medium',
-    'technical',
-    NOW(),
-    NOW()
-FROM users u, servers s
-LIMIT 1;
-```
 
 ## 🚫 Problèmes temporairement désactivés
 
 - **Scramble API** : Commenté dans `AppServiceProvider` et `routes/docs.php`
-- **Logs de débogage** : Gardés pour diagnostiquer les problèmes
+- **Logging des routes** : Supprimé pour éviter les erreurs RouteMatched
+- **Logs de débogage SQL** : Gardés pour diagnostiquer les problèmes
 
 ## 🔄 Réactivation future
 
@@ -79,15 +90,18 @@ Une fois que vous pourrez utiliser `php artisan migrate` :
 
 ## 📋 Vérification finale
 
-Après avoir appliqué la solution SQL :
+Après avoir appliqué la solution :
 - ✅ `/server/1/tickets` → Liste des tickets visible
 - ✅ `/server/1/tickets/1` → Ticket de bienvenue visible
-- ✅ `/server/1/tickets/2` → Deuxième ticket visible (si créé)
+- ✅ Plus d'erreur RouteMatched
+- ✅ Plus d'erreur Scramble
 
 ## 🐛 Erreurs corrigées
 
-- **RouteMatched::getName()** : Remplacé par les bonnes propriétés de l'événement
-- **Scramble API** : Temporairement désactivé pour éviter les erreurs de dépendances
+- **RouteMatched::getName()** : Supprimé
+- **RouteMatched::uri()** : Supprimé
+- **Scramble API** : Temporairement désactivé
+- **Logging des routes** : Supprimé pour éviter les erreurs
 
 ---
 
