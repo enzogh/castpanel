@@ -62,7 +62,7 @@ class MessagesRelationManager extends RelationManager
                         Tables\Columns\TextColumn::make('message')
                             ->label('Message')
                             ->wrap()
-                            ->prose(),
+                            ->html(),
                         
                         Tables\Columns\TextColumn::make('attachments')
                             ->label('Pièces jointes')
