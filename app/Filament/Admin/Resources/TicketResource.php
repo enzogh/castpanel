@@ -170,7 +170,7 @@ class TicketResource extends Resource
                         !$record->assigned_to ? 'Cliquez pour vous assigner' : 
                         ($record->assigned_to === auth()->id() ? 'Cliquez pour vous désassigner' : 'Assigné à quelqu\'un d\'autre')
                     )
-                    ->visible(fn () => auth()->user()->hasRole('admin')),
+                    ->visible(fn () => true), // Temporaire: visible pour tous pour debug
                 
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Créé le')
@@ -208,14 +208,15 @@ class TicketResource extends Resource
                 // Action unifiée pour la colonne cliquable
                 Tables\Actions\Action::make('assign_me')
                     ->action(function (Ticket $record) {
-                        if (!auth()->user()->hasRole('admin')) {
+                        // Temporaire: skip role check pour debug
+                        /*if (!auth()->user()->hasRole('admin')) {
                             \Filament\Notifications\Notification::make()
                                 ->danger()
                                 ->title('❌ Accès refusé')
                                 ->body('Cette action est réservée aux administrateurs.')
                                 ->send();
                             return;
-                        }
+                        }*/
 
                         if (!$record->assigned_to) {
                             // Assigner le ticket
@@ -259,7 +260,7 @@ class TicketResource extends Resource
                     ->label('M\'assigner')
                     ->icon('heroicon-o-user-plus')
                     ->color('success')
-                    ->visible(fn (Ticket $record) => !$record->assigned_to && auth()->user()->hasRole('admin'))
+                    ->visible(fn (Ticket $record) => !$record->assigned_to) // Temporaire: pas de check role
                     ->action(function (Ticket $record) {
                         $record->update([
                             'assigned_to' => auth()->id(),
@@ -281,7 +282,7 @@ class TicketResource extends Resource
                     ->label('Désassigner')
                     ->icon('heroicon-o-user-minus')
                     ->color('warning')
-                    ->visible(fn (Ticket $record) => $record->assigned_to === auth()->id() && auth()->user()->hasRole('admin'))
+                    ->visible(fn (Ticket $record) => $record->assigned_to === auth()->id()) // Temporaire: pas de check role
                     ->action(function (Ticket $record) {
                         $record->update([
                             'assigned_to' => null,

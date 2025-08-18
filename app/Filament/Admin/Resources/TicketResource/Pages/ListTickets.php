@@ -23,17 +23,33 @@ class ListTickets extends ListRecords
                     $totalTickets = Ticket::count();
                     $ticketIds = Ticket::pluck('id')->toArray();
                     $user = auth()->user();
+                    
+                    // Debug rôles détaillé
                     $userRoles = $user->roles()->pluck('name')->toArray();
+                    $hasAdminRole = $user->hasRole('admin');
+                    $hasRootRole = $user->hasRole('root');
+                    $hasSuperAdminRole = $user->hasRole('super-admin');
+                    
+                    // Tous les rôles dans la base
+                    $allRoles = \App\Models\Role::pluck('name')->toArray();
                     
                     // Tickets avec leurs détails
                     $ticketDetails = Ticket::select('id', 'title', 'user_id', 'status')->get()->map(function ($ticket) {
                         return "#{$ticket->id}: {$ticket->title} (User: {$ticket->user_id}, Status: {$ticket->status})";
                     })->toArray();
                     
+                    $debugInfo = "User: {$user->email} | ";
+                    $debugInfo .= "Roles: " . (empty($userRoles) ? 'AUCUN' : implode(', ', $userRoles)) . " | ";
+                    $debugInfo .= "hasRole('admin'): " . ($hasAdminRole ? 'OUI' : 'NON') . " | ";
+                    $debugInfo .= "hasRole('root'): " . ($hasRootRole ? 'OUI' : 'NON') . " | ";
+                    $debugInfo .= "hasRole('super-admin'): " . ($hasSuperAdminRole ? 'OUI' : 'NON') . " | ";
+                    $debugInfo .= "Tous rôles dispo: " . implode(', ', $allRoles) . " | ";
+                    $debugInfo .= "Total tickets: {$totalTickets}";
+                    
                     Notification::make()
                         ->warning()
-                        ->title('Debug: Tickets en base')
-                        ->body("User: {$user->email} | Roles: " . implode(', ', $userRoles) . " | Total: {$totalTickets} tickets | Détails: " . implode(' | ', $ticketDetails))
+                        ->title('Debug: Système de rôles')
+                        ->body($debugInfo)
                         ->persistent()
                         ->send();
                 }),
