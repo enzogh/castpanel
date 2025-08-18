@@ -74,7 +74,6 @@ class MessagesRelationManager extends RelationManager
                         Tables\Columns\TextColumn::make('message')
                             ->label('Message')
                             ->wrap()
-                            ->prose()
                             ->formatStateUsing(function ($state) {
                                 return nl2br(e($state));
                             })
