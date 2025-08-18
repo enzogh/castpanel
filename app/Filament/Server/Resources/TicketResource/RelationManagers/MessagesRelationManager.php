@@ -149,7 +149,19 @@ class MessagesRelationManager extends RelationManager
             if (!$this->ownerRecord || !method_exists($this->ownerRecord, 'messages')) {
                 Log::warning('MessagesRelationManager: ownerRecord ou relation messages manquante');
                 // Retourner une requête vide en utilisant DB directement
-                return DB::table('ticket_messages')->whereRaw('1 = 0')->getQuery();
+                try {
+                    $query = DB::table('ticket_messages')->whereRaw('1 = 0')->getQuery();
+                    if ($query) {
+                        return $query;
+                    }
+                } catch (\Exception $dbError) {
+                    Log::error('MessagesRelationManager: Erreur DB::table()', [
+                        'error' => $dbError->getMessage(),
+                    ]);
+                }
+                
+                // Si DB::table() échoue, créer une requête vide manuellement
+                return \Illuminate\Database\Eloquent\Builder::query(\DB::connection());
             }
             
             return parent::getTableQuery()
@@ -160,8 +172,21 @@ class MessagesRelationManager extends RelationManager
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
-            // En cas d'erreur, retourner une requête vide en utilisant DB directement
-            return DB::table('ticket_messages')->whereRaw('1 = 0')->getQuery();
+            
+            // En cas d'erreur, créer une requête vide manuellement
+            try {
+                $query = DB::table('ticket_messages')->whereRaw('1 = 0')->getQuery();
+                if ($query) {
+                    return $query;
+                }
+            } catch (\Exception $dbError) {
+                Log::error('MessagesRelationManager: Erreur DB::table() dans catch', [
+                    'error' => $dbError->getMessage(),
+                ]);
+            }
+            
+            // Dernier recours : requête vide manuelle
+            return \Illuminate\Database\Eloquent\Builder::query(\DB::connection());
         }
     }
 }

@@ -32,3 +32,9 @@ Route::get('/ultra-simple', [App\Http\Controllers\UltraSimpleController::class, 
 
 // Route pour forcer la création de tout (DB::table() uniquement)
 Route::get('/force-create-all-db', [App\Http\Controllers\ForceCreateAllDBController::class, 'create'])->name('force.create.all.db');
+
+// Route pour tester la connexion de base
+Route::get('/test-connection', [App\Http\Controllers\TestConnectionController::class, 'test'])->name('test.connection');
+
+// Route pour tester la création de table simple
+Route::get('/test-simple-table', [App\Http\Controllers\TestSimpleTableController::class, 'test'])->name('test.simple.table');
