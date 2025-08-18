@@ -12,7 +12,7 @@ class ViewTicket extends ViewRecord
 {
     protected static string $resource = TicketResource::class;
 
-    protected function resolveRecord($key): ?Ticket
+    protected function resolveRecord(string|int $key): \Illuminate\Database\Eloquent\Model
     {
         $record = parent::resolveRecord($key);
         
@@ -47,6 +47,14 @@ class ViewTicket extends ViewRecord
                     'server_id' => $serverId,
                 ],
             ]);
+            
+            // Si toujours pas de record, créer un record vide pour éviter l'erreur
+            if (!$record) {
+                Log::error('Ticket still not found, creating empty record to prevent error');
+                $record = new Ticket();
+                $record->id = $key;
+                $record->exists = false; // Marquer comme non existant
+            }
         }
         
         return $record;
