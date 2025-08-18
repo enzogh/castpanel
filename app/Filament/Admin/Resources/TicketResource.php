@@ -140,7 +140,13 @@ class TicketResource extends Resource
                 
                 Tables\Columns\TextColumn::make('assignedTo.email')
                     ->label('Assigné à')
-                    ->placeholder('Non assigné'),
+                    ->placeholder('Non assigné')
+                    ->badge()
+                    ->color(fn (Ticket $record) => $record->assigned_to === auth()->id() ? 'success' : 'gray')
+                    ->formatStateUsing(function ($state, Ticket $record) {
+                        if (!$state) return 'Non assigné';
+                        return $record->assigned_to === auth()->id() ? '🔵 ' . $state : $state;
+                    }),
                 
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Créé le')
@@ -163,13 +169,121 @@ class TicketResource extends Resource
                 Tables\Filters\SelectFilter::make('assigned_to')
                     ->label('Assigné à')
                     ->relationship('assignedTo', 'email'),
+                
+                Tables\Filters\Filter::make('my_tickets')
+                    ->label('Mes tickets')
+                    ->query(fn (Builder $query) => $query->where('assigned_to', auth()->id()))
+                    ->toggle(),
+                
+                Tables\Filters\Filter::make('unassigned')
+                    ->label('Non assignés')
+                    ->query(fn (Builder $query) => $query->whereNull('assigned_to'))
+                    ->toggle(),
             ])
             ->actions([
+                Tables\Actions\Action::make('assign_to_me')
+                    ->label('M\'assigner')
+                    ->icon('heroicon-o-user-plus')
+                    ->color('success')
+                    ->visible(fn (Ticket $record) => !$record->assigned_to)
+                    ->action(function (Ticket $record) {
+                        $record->update([
+                            'assigned_to' => auth()->id(),
+                            'status' => $record->status === Ticket::STATUS_OPEN ? Ticket::STATUS_IN_PROGRESS : $record->status,
+                        ]);
+                        
+                        \Filament\Notifications\Notification::make()
+                            ->success()
+                            ->title('Ticket assigné')
+                            ->body("Le ticket #{$record->id} vous a été assigné.")
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->modalHeading('Assigner le ticket')
+                    ->modalDescription(fn (Ticket $record) => "Êtes-vous sûr de vouloir vous assigner le ticket #{$record->id} : {$record->title} ?")
+                    ->modalSubmitActionLabel('Oui, m\'assigner'),
+                
+                Tables\Actions\Action::make('unassign')
+                    ->label('Désassigner')
+                    ->icon('heroicon-o-user-minus')
+                    ->color('warning')
+                    ->visible(fn (Ticket $record) => $record->assigned_to === auth()->id())
+                    ->action(function (Ticket $record) {
+                        $record->update([
+                            'assigned_to' => null,
+                            'status' => Ticket::STATUS_OPEN,
+                        ]);
+                        
+                        \Filament\Notifications\Notification::make()
+                            ->success()
+                            ->title('Ticket désassigné')
+                            ->body("Le ticket #{$record->id} n'est plus assigné.")
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->modalHeading('Désassigner le ticket')
+                    ->modalDescription(fn (Ticket $record) => "Êtes-vous sûr de vouloir vous désassigner du ticket #{$record->id} : {$record->title} ?")
+                    ->modalSubmitActionLabel('Oui, me désassigner'),
+                
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\BulkAction::make('assign_to_me_bulk')
+                        ->label('M\'assigner tous')
+                        ->icon('heroicon-o-user-plus')
+                        ->color('success')
+                        ->action(function ($records) {
+                            $count = 0;
+                            foreach ($records as $record) {
+                                if (!$record->assigned_to) {
+                                    $record->update([
+                                        'assigned_to' => auth()->id(),
+                                        'status' => $record->status === Ticket::STATUS_OPEN ? Ticket::STATUS_IN_PROGRESS : $record->status,
+                                    ]);
+                                    $count++;
+                                }
+                            }
+                            
+                            \Filament\Notifications\Notification::make()
+                                ->success()
+                                ->title('Tickets assignés')
+                                ->body("{$count} ticket(s) vous ont été assignés.")
+                                ->send();
+                        })
+                        ->requiresConfirmation()
+                        ->modalHeading('Assigner les tickets sélectionnés')
+                        ->modalDescription('Êtes-vous sûr de vouloir vous assigner tous les tickets sélectionnés qui ne sont pas déjà assignés ?')
+                        ->modalSubmitActionLabel('Oui, m\'assigner tous'),
+                    
+                    Tables\Actions\BulkAction::make('unassign_bulk')
+                        ->label('Désassigner tous')
+                        ->icon('heroicon-o-user-minus')
+                        ->color('warning')
+                        ->action(function ($records) {
+                            $count = 0;
+                            foreach ($records as $record) {
+                                if ($record->assigned_to === auth()->id()) {
+                                    $record->update([
+                                        'assigned_to' => null,
+                                        'status' => Ticket::STATUS_OPEN,
+                                    ]);
+                                    $count++;
+                                }
+                            }
+                            
+                            \Filament\Notifications\Notification::make()
+                                ->success()
+                                ->title('Tickets désassignés')
+                                ->body("{$count} ticket(s) ont été désassignés.")
+                                ->send();
+                        })
+                        ->requiresConfirmation()
+                        ->modalHeading('Désassigner les tickets sélectionnés')
+                        ->modalDescription('Êtes-vous sûr de vouloir vous désassigner de tous les tickets sélectionnés qui vous sont actuellement assignés ?')
+                        ->modalSubmitActionLabel('Oui, me désassigner de tous'),
+                    
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ])
