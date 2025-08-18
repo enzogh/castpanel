@@ -255,8 +255,8 @@ class TicketResource extends Resource
             'url' => request()->url(),
         ]);
         
+        // TEMPORAIREMENT : Ne pas filtrer par utilisateur pour déboguer
         $query = parent::getEloquentQuery()
-            ->where('user_id', $userId)
             ->where('server_id', $serverId)
             ->with(['server', 'assignedTo', 'messages']);
         

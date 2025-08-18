@@ -3,7 +3,7 @@
 use Illuminate\Support\Str;
 
 $database = env('DB_DATABASE', 'database.sqlite');
-$datapasePath = database_path($database);
+$databasePath = database_path($database);
 
 if (str_starts_with($database, '/') || $database === ':memory:') {
     $databasePath = $database;

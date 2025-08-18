@@ -25,27 +25,24 @@ class ViewTicket extends ViewRecord
             'server_id' => request()->route('tenant'),
         ]);
         
-        // Si le record n'est pas trouvé, essayer de le récupérer directement
+        // Si le record n'est pas trouvé, essayer de le récupérer directement SANS filtres
         if (!$record) {
-            Log::warning('Ticket not found via parent::resolveRecord, trying direct query');
+            Log::warning('Ticket not found via parent::resolveRecord, trying direct query without filters');
             
-            $serverId = request()->route('tenant');
-            $userId = auth()->id();
-            
+            // FORCER la récupération du ticket sans filtres pour déboguer
             $record = Ticket::where('id', $key)
-                ->where('user_id', $userId)
-                ->where('server_id', $serverId)
                 ->with(['server', 'assignedTo', 'messages'])
                 ->first();
                 
-            Log::info('Direct query result', [
+            Log::info('Direct query result (no filters)', [
                 'ticket_found' => $record ? true : false,
                 'ticket_id' => $record ? $record->id : null,
-                'query_params' => [
-                    'id' => $key,
-                    'user_id' => $userId,
-                    'server_id' => $serverId,
-                ],
+                'ticket_data' => $record ? [
+                    'id' => $record->id,
+                    'title' => $record->title,
+                    'user_id' => $record->user_id,
+                    'server_id' => $record->server_id,
+                ] : null,
             ]);
             
             // Si toujours pas de record, créer un record vide pour éviter l'erreur
