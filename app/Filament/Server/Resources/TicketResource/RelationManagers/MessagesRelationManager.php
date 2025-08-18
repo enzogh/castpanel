@@ -151,7 +151,7 @@ class MessagesRelationManager extends RelationManager
             if (!$this->ownerRecord || !method_exists($this->ownerRecord, 'messages')) {
                 Log::warning('MessagesRelationManager: ownerRecord ou relation messages manquante');
                 // Retourner une requête vide
-                return DB::table('ticket_messages')->whereRaw('1 = 0')->getQuery();
+                return DB::table('ticket_messages')->whereRaw('1 = 0');
             }
             
             // Vérifier que parent::getTableQuery() retourne une requête valide
@@ -160,7 +160,7 @@ class MessagesRelationManager extends RelationManager
             if (!$parentQuery) {
                 Log::warning('MessagesRelationManager: parent::getTableQuery() retourne null');
                 // Retourner une requête vide
-                return DB::table('ticket_messages')->whereRaw('1 = 0')->getQuery();
+                return DB::table('ticket_messages')->whereRaw('1 = 0');
             }
             
             return $parentQuery
@@ -173,7 +173,7 @@ class MessagesRelationManager extends RelationManager
             ]);
             
             // Retourner une requête vide en cas d'erreur
-            return DB::table('ticket_messages')->whereRaw('1 = 0')->getQuery();
+            return DB::table('ticket_messages')->whereRaw('1 = 0');
         }
     }
 }
