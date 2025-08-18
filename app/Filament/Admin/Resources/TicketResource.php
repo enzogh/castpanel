@@ -156,6 +156,21 @@ class TicketResource extends Resource
                         if (!$state) return 'Non assigné';
                         return $record->assigned_to === auth()->id() ? '🔵 ' . $state : $state;
                     }),
+
+                Tables\Columns\IconColumn::make('admin_assign_action')
+                    ->label('🚀 Admin')
+                    ->boolean()
+                    ->state(fn (Ticket $record) => !$record->assigned_to)
+                    ->trueIcon('heroicon-s-user-plus')
+                    ->falseIcon(fn (Ticket $record) => $record->assigned_to === auth()->id() ? 'heroicon-s-user-minus' : 'heroicon-s-check-circle')
+                    ->trueColor('success')
+                    ->falseColor(fn (Ticket $record) => $record->assigned_to === auth()->id() ? 'warning' : 'gray')
+                    ->action('assign_me')
+                    ->tooltip(fn (Ticket $record) => 
+                        !$record->assigned_to ? 'Cliquez pour vous assigner' : 
+                        ($record->assigned_to === auth()->id() ? 'Cliquez pour vous désassigner' : 'Assigné à quelqu\'un d\'autre')
+                    )
+                    ->visible(fn () => auth()->user()->hasRole('admin')),
                 
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Créé le')
@@ -190,11 +205,61 @@ class TicketResource extends Resource
                     ->toggle(),
             ])
             ->actions([
+                // Action unifiée pour la colonne cliquable
+                Tables\Actions\Action::make('assign_me')
+                    ->action(function (Ticket $record) {
+                        if (!auth()->user()->hasRole('admin')) {
+                            \Filament\Notifications\Notification::make()
+                                ->danger()
+                                ->title('❌ Accès refusé')
+                                ->body('Cette action est réservée aux administrateurs.')
+                                ->send();
+                            return;
+                        }
+
+                        if (!$record->assigned_to) {
+                            // Assigner le ticket
+                            $record->update([
+                                'assigned_to' => auth()->id(),
+                                'status' => $record->status === Ticket::STATUS_OPEN ? Ticket::STATUS_IN_PROGRESS : $record->status,
+                            ]);
+                            
+                            \Filament\Notifications\Notification::make()
+                                ->success()
+                                ->title('🚀 Ticket assigné')
+                                ->body("Le ticket #{$record->id} vous a été assigné avec succès!")
+                                ->duration(4000)
+                                ->send();
+                                
+                        } elseif ($record->assigned_to === auth()->id()) {
+                            // Se désassigner
+                            $record->update([
+                                'assigned_to' => null,
+                                'status' => Ticket::STATUS_OPEN,
+                            ]);
+                            
+                            \Filament\Notifications\Notification::make()
+                                ->success()
+                                ->title('✅ Ticket désassigné')
+                                ->body("Vous n'êtes plus assigné au ticket #{$record->id}.")
+                                ->duration(4000)
+                                ->send();
+                        } else {
+                            \Filament\Notifications\Notification::make()
+                                ->warning()
+                                ->title('⚠️ Ticket déjà assigné')
+                                ->body("Ce ticket est déjà assigné à quelqu'un d'autre.")
+                                ->send();
+                        }
+                    })
+                    ->visible(false),
+                
+                // Actions traditionnelles dans le menu
                 Tables\Actions\Action::make('assign_to_me')
                     ->label('M\'assigner')
                     ->icon('heroicon-o-user-plus')
                     ->color('success')
-                    ->visible(fn (Ticket $record) => !$record->assigned_to)
+                    ->visible(fn (Ticket $record) => !$record->assigned_to && auth()->user()->hasRole('admin'))
                     ->action(function (Ticket $record) {
                         $record->update([
                             'assigned_to' => auth()->id(),
@@ -216,7 +281,7 @@ class TicketResource extends Resource
                     ->label('Désassigner')
                     ->icon('heroicon-o-user-minus')
                     ->color('warning')
-                    ->visible(fn (Ticket $record) => $record->assigned_to === auth()->id())
+                    ->visible(fn (Ticket $record) => $record->assigned_to === auth()->id() && auth()->user()->hasRole('admin'))
                     ->action(function (Ticket $record) {
                         $record->update([
                             'assigned_to' => null,
