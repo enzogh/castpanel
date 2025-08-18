@@ -90,6 +90,15 @@ class TicketResource extends Resource
             ]);
     }
 
+    public static function getEloquentQuery(): Builder
+    {
+        // S'assurer qu'on récupère tous les tickets sans restriction pour les admins
+        $query = parent::getEloquentQuery()->withoutGlobalScopes();
+        
+        // Pour debug: toujours afficher tous les tickets dans l'interface admin
+        return $query;
+    }
+
     public static function table(Table $table): Table
     {
         return $table
@@ -287,7 +296,8 @@ class TicketResource extends Resource
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ])
-            ->defaultSort('created_at', 'desc');
+            ->defaultSort('created_at', 'desc')
+            ->deferLoading();
     }
 
     public static function infolist(Infolist $infolist): Infolist

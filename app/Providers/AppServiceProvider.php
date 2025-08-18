@@ -5,6 +5,9 @@ namespace App\Providers;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Gate;
+use App\Models\Ticket;
+use App\Policies\TicketPolicy;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -36,6 +39,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Enregistrer les politiques
+        Gate::policy(Ticket::class, TicketPolicy::class);
+        
         // Activer le débogage des requêtes SQL en mode développement
         if (app()->environment('local', 'development')) {
             DB::listen(function ($query) {
