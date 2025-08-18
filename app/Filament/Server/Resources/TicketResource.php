@@ -245,11 +245,28 @@ class TicketResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         $serverId = request()->route('tenant');
+        $userId = auth()->id();
         
-        return parent::getEloquentQuery()
-            ->where('user_id', auth()->id())
+        // Log pour débogage
+        \Log::info('TicketResource::getEloquentQuery', [
+            'server_id' => $serverId,
+            'user_id' => $userId,
+            'route' => request()->route()->getName(),
+            'url' => request()->url(),
+        ]);
+        
+        $query = parent::getEloquentQuery()
+            ->where('user_id', $userId)
             ->where('server_id', $serverId)
             ->with(['server', 'assignedTo', 'messages']);
+        
+        // Log de la requête SQL générée
+        \Log::info('Ticket query SQL', [
+            'sql' => $query->toSql(),
+            'bindings' => $query->getBindings(),
+        ]);
+        
+        return $query;
     }
 
     public static function getRelations(): array
